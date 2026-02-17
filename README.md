@@ -222,7 +222,3 @@ It is structured so these can be added without major rewrites.
 5. Add role/permission behavior for update visibility
 
 ---
-
-## License
-
-Add your preferred license in this repository (for example, MIT).
