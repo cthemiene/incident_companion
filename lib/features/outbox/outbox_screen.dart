@@ -9,6 +9,7 @@ import '../../shared/widgets/empty_state.dart';
 import '../../shared/widgets/loading_skeleton.dart';
 import 'outbox_provider.dart';
 
+/// Legacy outbox queue screen kept for sync simulation workflows.
 class OutboxScreen extends StatefulWidget {
   const OutboxScreen({super.key});
 
@@ -17,6 +18,7 @@ class OutboxScreen extends StatefulWidget {
 }
 
 class _OutboxScreenState extends State<OutboxScreen> {
+  /// Initial queue load after first frame.
   @override
   void initState() {
     super.initState();
@@ -61,6 +63,7 @@ class _OutboxScreenState extends State<OutboxScreen> {
     );
   }
 
+  /// Renders loading/error/empty/list states for outbox data.
   Widget _buildBody(BuildContext context, OutboxProvider provider) {
     if (provider.loading && provider.list.isEmpty) {
       return const LoadingSkeleton(itemCount: 4);
@@ -169,6 +172,7 @@ class _OutboxScreenState extends State<OutboxScreen> {
     );
   }
 
+  /// Human-readable status-change summary for each queued update.
   String _statusChangeLabel(IncidentUpdate update) {
     if (update.newStatus == null) {
       return 'Status change: none';
@@ -184,6 +188,7 @@ class _OutboxScreenState extends State<OutboxScreen> {
   }
 }
 
+/// Visual chip for queued update sync state.
 class _SyncStateChip extends StatelessWidget {
   const _SyncStateChip({required this.state});
 

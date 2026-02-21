@@ -1,11 +1,15 @@
 import 'package:hive/hive.dart';
 
+/// Lifecycle state for an incident ticket.
 enum IncidentStatus { open, inProgress, resolved }
 
+/// Business severity scale where S5 is the lowest default severity.
 enum IncidentSeverity { s1, s2, s3, s4, s5 }
 
+/// Deployment environment impacted by the incident.
 enum IncidentEnvironment { prod, nonProd }
 
+/// Primary incident entity stored in Hive and used across the UI.
 class Incident {
   const Incident({
     required this.id,
@@ -31,6 +35,7 @@ class Incident {
   final DateTime updatedAt;
   final String? assignedTo;
 
+  /// Returns a modified copy while preserving unchanged fields.
   Incident copyWith({
     String? id,
     String? title,
@@ -156,6 +161,7 @@ class IncidentEnvironmentAdapter extends TypeAdapter<IncidentEnvironment> {
   }
 }
 
+/// Hive adapter for the `Incident` object schema.
 class IncidentAdapter extends TypeAdapter<Incident> {
   @override
   final int typeId = 3;
@@ -209,6 +215,7 @@ class IncidentAdapter extends TypeAdapter<Incident> {
   }
 }
 
+/// Registers all incident-related adapters once at startup.
 void registerIncidentAdapters() {
   if (!Hive.isAdapterRegistered(0)) {
     Hive.registerAdapter(IncidentStatusAdapter());

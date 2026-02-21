@@ -11,6 +11,7 @@ import '../../shared/widgets/loading_skeleton.dart';
 import '../../shared/widgets/severity_badge.dart';
 import '../../shared/widgets/status_chip.dart';
 
+/// Main incident list with tabs, global search, and filters.
 class IncidentsListScreen extends StatefulWidget {
   const IncidentsListScreen({super.key});
 
@@ -37,6 +38,7 @@ class _IncidentsListScreenState extends State<IncidentsListScreen>
       if (!mounted) {
         return;
       }
+      // Initial load is deferred to ensure provider context is fully ready.
       context.read<IncidentsProvider>().loadIncidents();
     });
   }
@@ -60,10 +62,10 @@ class _IncidentsListScreenState extends State<IncidentsListScreen>
       appBar: AppBar(
         title: const Text('Incidents'),
         actions: <Widget>[
-          IconButton(
+          TextButton.icon(
             onPressed: () => context.push('/my-items'),
-            tooltip: 'My Items',
-            icon: const Icon(Icons.assignment_ind_outlined),
+            icon: const Icon(Icons.fact_check_outlined, size: 18),
+            label: const Text('My Items'),
           ),
           PopupMenuButton<_AppMenuAction>(
             onSelected: (action) async {
@@ -142,6 +144,7 @@ class _IncidentsListScreenState extends State<IncidentsListScreen>
     );
   }
 
+  /// Renders loading/error/empty/list states for the incident feed.
   Widget _buildContent(BuildContext context, IncidentsProvider provider) {
     if (provider.loading && provider.list.isEmpty) {
       return const LoadingSkeleton();
@@ -228,6 +231,7 @@ class _IncidentsListScreenState extends State<IncidentsListScreen>
     );
   }
 
+  /// Opens a top-anchored filter panel and applies the selected values.
   Future<void> _openFilters(
     BuildContext context,
     IncidentsProvider provider,
@@ -236,113 +240,171 @@ class _IncidentsListScreenState extends State<IncidentsListScreen>
     var draftAssignedToMe = provider.assignedToMe;
     var draftProdOnly = provider.environment == IncidentEnvironment.prod;
 
-    await showModalBottomSheet<void>(
+    await showGeneralDialog<void>(
       context: context,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (sheetContext) {
+      barrierLabel: 'Filters',
+      barrierDismissible: true,
+      barrierColor: Colors.black45,
+      transitionDuration: const Duration(milliseconds: 240),
+      pageBuilder: (dialogContext, _, __) {
         return StatefulBuilder(
           builder: (context, setSheetState) {
             return SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(
-                      'Filters',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w700,
+              child: Align(
+                alignment: Alignment.topCenter,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+                  child: Material(
+                    color: Theme.of(context).colorScheme.surface,
+                    borderRadius: const BorderRadius.vertical(
+                      bottom: Radius.circular(22),
+                    ),
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxWidth: 680,
+                        maxHeight: MediaQuery.of(context).size.height * 0.86,
+                      ),
+                      child: SingleChildScrollView(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: <Widget>[
+                              Row(
+                                children: <Widget>[
+                                  Text(
+                                    'Filters',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleLarge
+                                        ?.copyWith(fontWeight: FontWeight.w700),
+                                  ),
+                                  const Spacer(),
+                                  IconButton(
+                                    onPressed: () =>
+                                        Navigator.of(dialogContext).pop(),
+                                    icon: const Icon(Icons.close),
+                                    tooltip: 'Close',
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Severity',
+                                style: Theme.of(context).textTheme.titleSmall,
+                              ),
+                              const SizedBox(height: 8),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: IncidentSeverity.values
+                                    .map((severity) {
+                                      final selected = draftSeverities.contains(
+                                        severity,
+                                      );
+                                      return FilterChip(
+                                        selected: selected,
+                                        label: Text(
+                                          severity.name.toUpperCase(),
+                                        ),
+                                        onSelected: (value) {
+                                          setSheetState(() {
+                                            if (value) {
+                                              draftSeverities.add(severity);
+                                            } else {
+                                              draftSeverities.remove(severity);
+                                            }
+                                          });
+                                        },
+                                      );
+                                    })
+                                    .toList(growable: false),
+                              ),
+                              const SizedBox(height: 8),
+                              SwitchListTile(
+                                title: const Text('Assigned to me'),
+                                value: draftAssignedToMe,
+                                contentPadding: EdgeInsets.zero,
+                                onChanged: (value) {
+                                  setSheetState(
+                                    () => draftAssignedToMe = value,
+                                  );
+                                },
+                              ),
+                              SwitchListTile(
+                                title: const Text('Production only'),
+                                subtitle: const Text(
+                                  'Turn off to include all environments',
+                                ),
+                                value: draftProdOnly,
+                                contentPadding: EdgeInsets.zero,
+                                onChanged: (value) {
+                                  setSheetState(() => draftProdOnly = value);
+                                },
+                              ),
+                              const SizedBox(height: 8),
+                              Row(
+                                children: <Widget>[
+                                  TextButton(
+                                    onPressed: () {
+                                      setSheetState(() {
+                                        draftSeverities.clear();
+                                        draftAssignedToMe = false;
+                                        draftProdOnly = false;
+                                      });
+                                    },
+                                    child: const Text('Reset'),
+                                  ),
+                                  const Spacer(),
+                                  FilledButton(
+                                    onPressed: () {
+                                      Navigator.of(dialogContext).pop();
+                                      provider.setFilters(
+                                        severities: draftSeverities,
+                                        assignedToMe: draftAssignedToMe,
+                                        environment: draftProdOnly
+                                            ? IncidentEnvironment.prod
+                                            : null,
+                                      );
+                                    },
+                                    child: const Text('Apply'),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'Severity',
-                      style: Theme.of(context).textTheme.titleSmall,
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: IncidentSeverity.values
-                          .map((severity) {
-                            final selected = draftSeverities.contains(severity);
-                            return FilterChip(
-                              selected: selected,
-                              label: Text(severity.name.toUpperCase()),
-                              onSelected: (value) {
-                                setSheetState(() {
-                                  if (value) {
-                                    draftSeverities.add(severity);
-                                  } else {
-                                    draftSeverities.remove(severity);
-                                  }
-                                });
-                              },
-                            );
-                          })
-                          .toList(growable: false),
-                    ),
-                    const SizedBox(height: 8),
-                    SwitchListTile(
-                      title: const Text('Assigned to me'),
-                      value: draftAssignedToMe,
-                      contentPadding: EdgeInsets.zero,
-                      onChanged: (value) {
-                        setSheetState(() => draftAssignedToMe = value);
-                      },
-                    ),
-                    SwitchListTile(
-                      title: const Text('Production only'),
-                      subtitle: const Text(
-                        'Turn off to include all environments',
-                      ),
-                      value: draftProdOnly,
-                      contentPadding: EdgeInsets.zero,
-                      onChanged: (value) {
-                        setSheetState(() => draftProdOnly = value);
-                      },
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: <Widget>[
-                        TextButton(
-                          onPressed: () {
-                            setSheetState(() {
-                              draftSeverities.clear();
-                              draftAssignedToMe = false;
-                              draftProdOnly = false;
-                            });
-                          },
-                          child: const Text('Reset'),
-                        ),
-                        const Spacer(),
-                        FilledButton(
-                          onPressed: () {
-                            Navigator.of(sheetContext).pop();
-                            provider.setFilters(
-                              severities: draftSeverities,
-                              assignedToMe: draftAssignedToMe,
-                              environment: draftProdOnly
-                                  ? IncidentEnvironment.prod
-                                  : null,
-                            );
-                          },
-                          child: const Text('Apply'),
-                        ),
-                      ],
-                    ),
-                  ],
+                  ),
                 ),
               ),
             );
           },
         );
       },
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
+        final curved = CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutCubic,
+          reverseCurve: Curves.easeInCubic,
+        );
+        return FadeTransition(
+          opacity: curved,
+          child: SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(0, -0.18),
+              end: Offset.zero,
+            ).animate(curved),
+            child: child,
+          ),
+        );
+      },
     );
   }
 
+  /// Maps enum values to tab indexes.
   int _statusToIndex(IncidentStatus status) {
     switch (status) {
       case IncidentStatus.open:
@@ -354,6 +416,7 @@ class _IncidentsListScreenState extends State<IncidentsListScreen>
     }
   }
 
+  /// Maps tab indexes back to status enums.
   IncidentStatus _indexToStatus(int index) {
     switch (index) {
       case 0:
@@ -366,6 +429,7 @@ class _IncidentsListScreenState extends State<IncidentsListScreen>
     }
   }
 
+  /// Compact relative timestamp formatting for list rows.
   String _timeAgo(DateTime timestamp) {
     final diff = DateTime.now().difference(timestamp);
     if (diff.inSeconds < 60) {

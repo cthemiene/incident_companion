@@ -6,9 +6,15 @@ import '../features/incidents/incident_detail_screen.dart';
 import '../features/incidents/incidents_list_screen.dart';
 import '../features/my_items/my_items_screen.dart';
 
+/// Centralized route definitions and auth guard behavior.
 class AppRouter {
   AppRouter._();
 
+  /// Builds the app router.
+  ///
+  /// Redirect rules:
+  /// - Anonymous users can only access `/login`.
+  /// - Authenticated users are redirected away from `/login`.
   static GoRouter createRouter(AuthProvider authProvider) {
     return GoRouter(
       initialLocation: '/incidents',

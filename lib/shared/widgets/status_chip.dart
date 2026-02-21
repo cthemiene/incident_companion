@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../data/models/incident.dart';
 
+/// Color-coded status chip with dot indicator.
 class StatusChip extends StatelessWidget {
   const StatusChip({super.key, required this.status});
 

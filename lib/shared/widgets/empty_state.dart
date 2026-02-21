@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+/// Reusable empty/error placeholder with optional call-to-action button.
 class EmptyState extends StatelessWidget {
   const EmptyState({
     super.key,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../data/models/incident.dart';
 
+/// Color-coded severity label used on incident cards.
 class SeverityBadge extends StatelessWidget {
   const SeverityBadge({super.key, required this.severity});
 
@@ -13,8 +14,16 @@ class SeverityBadge extends StatelessWidget {
       IncidentSeverity.s1 => ('S1', const Color(0xFFB42318), Colors.white),
       IncidentSeverity.s2 => ('S2', const Color(0xFFDD6B20), Colors.white),
       IncidentSeverity.s3 => ('S3', const Color(0xFF1C6BFF), Colors.white),
-      IncidentSeverity.s4 => ('S4', const Color(0xFFE8EDF5), const Color(0xFF334155),),
-      IncidentSeverity.s5 => ('S5', const Color(0xFFF8FAFC), const Color(0xFF64748B),),
+      IncidentSeverity.s4 => (
+        'S4',
+        const Color(0xFFE8EDF5),
+        const Color(0xFF334155),
+      ),
+      IncidentSeverity.s5 => (
+        'S5',
+        const Color(0xFFF8FAFC),
+        const Color(0xFF64748B),
+      ),
     };
 
     return Container(
