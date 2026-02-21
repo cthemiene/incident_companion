@@ -6,6 +6,9 @@ import 'package:uuid/uuid.dart';
 import '../../data/mock/mock_users.dart';
 import '../../data/models/incident.dart';
 import '../../data/repositories/mock_incident_repository.dart';
+import '../../data/mock/mock_scope_data.dart';
+import '../../shared/utils/permissions.dart';
+import '../../shared/utils/user_role.dart';
 import '../auth/auth_provider.dart';
 import '../my_items/my_items_provider.dart';
 import 'incidents_provider.dart';
@@ -263,14 +266,37 @@ class _CreateIncidentScreenState extends State<CreateIncidentScreen> {
       return;
     }
 
+    final authProvider = context.read<AuthProvider>();
     final repository = context.read<MockIncidentRepository>();
     final incidentsProvider = context.read<IncidentsProvider>();
     final myItemsProvider = context.read<MyItemsProvider>();
-    final currentUser = context.read<AuthProvider>().currentUserEmail;
+    final currentUser = authProvider.currentUserEmail;
+    if (!PermissionPolicy.canCreateIncident(authProvider.currentUserRole)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('You do not have permission to create incidents.'),
+        ),
+      );
+      return;
+    }
     if (_assigneeInputInvalid) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Select a user from search results or clear assignee.'),
+        ),
+      );
+      return;
+    }
+    if (!PermissionPolicy.canAssignTo(
+      role: authProvider.currentUserRole,
+      currentUserEmail: currentUser,
+      targetAssignee: _selectedAssignee,
+    )) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Your role can only assign to yourself or leave unassigned.',
+          ),
         ),
       );
       return;
@@ -283,6 +309,17 @@ class _CreateIncidentScreenState extends State<CreateIncidentScreen> {
       // Reserve sequence at submit time to avoid duplicate preview IDs.
       final reservedIncidentNumber = await repository
           .reserveNextIncidentNumber();
+      final assignedProfile = findMockUserProfileByEmail(_selectedAssignee);
+      final scopeOrganizationId = authProvider.currentUserRole == UserRole.admin
+          ? (assignedProfile?.organizationId ??
+                authProvider.currentOrganizationId ??
+                defaultMockOrganizationId)
+          : (authProvider.currentOrganizationId ?? defaultMockOrganizationId);
+      final scopeTeamId = authProvider.currentUserRole == UserRole.admin
+          ? (assignedProfile?.teamId ??
+                authProvider.currentTeamId ??
+                defaultMockTeamId)
+          : (authProvider.currentTeamId ?? defaultMockTeamId);
       final incident = Incident(
         // Internal immutable ID for persistence/routing/backend alignment.
         id: const Uuid().v4(),
@@ -292,6 +329,8 @@ class _CreateIncidentScreenState extends State<CreateIncidentScreen> {
         status: _status,
         severity: _severity,
         service: _serviceController.text.trim(),
+        organizationId: scopeOrganizationId,
+        teamId: scopeTeamId,
         environment: _environment,
         createdAt: _createdAt,
         updatedAt: _updatedAt,

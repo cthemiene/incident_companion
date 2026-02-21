@@ -6,6 +6,8 @@ import '../../../data/mock/mock_users.dart';
 import '../../../data/models/incident.dart';
 import '../../../data/models/incident_update.dart';
 import '../../../data/repositories/mock_incident_repository.dart';
+import '../../../shared/utils/permissions.dart';
+import '../../../shared/utils/user_role.dart';
 import '../../auth/auth_provider.dart';
 import '../../outbox/outbox_provider.dart';
 import 'assignee_selector_field.dart';
@@ -35,6 +37,7 @@ class _UpdateIncidentSheetState extends State<UpdateIncidentSheet> {
   bool _submitting = false;
 
   late final String _currentUserEmail;
+  late final UserRole _currentUserRole;
   String? _selectedAssignee;
   bool _assigneeInputInvalid = false;
 
@@ -44,6 +47,7 @@ class _UpdateIncidentSheetState extends State<UpdateIncidentSheet> {
     super.initState();
     final authProvider = context.read<AuthProvider>();
     _currentUserEmail = authProvider.currentUserEmail ?? defaultMockUserEmail;
+    _currentUserRole = authProvider.currentUserRole;
     // Preserve existing assignment when opening the update sheet.
     _selectedAssignee = widget.initialAssignedTo?.trim();
   }
@@ -183,6 +187,20 @@ class _UpdateIncidentSheetState extends State<UpdateIncidentSheet> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Select a user from search results or clear assignee.'),
+        ),
+      );
+      return;
+    }
+    if (!PermissionPolicy.canAssignTo(
+      role: _currentUserRole,
+      currentUserEmail: _currentUserEmail,
+      targetAssignee: _selectedAssignee,
+    )) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Your role can only assign to yourself or leave unassigned.',
+          ),
         ),
       );
       return;

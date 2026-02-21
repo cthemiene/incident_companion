@@ -1,5 +1,8 @@
 import 'package:hive/hive.dart';
 
+import '../mock/mock_scope_data.dart';
+import '../mock/mock_users.dart';
+
 /// Lifecycle state for an incident ticket.
 enum IncidentStatus { open, inProgress, resolved }
 
@@ -19,6 +22,8 @@ class Incident {
     required this.status,
     this.severity = IncidentSeverity.s5,
     required this.service,
+    required this.organizationId,
+    required this.teamId,
     required this.environment,
     required this.createdAt,
     required this.updatedAt,
@@ -35,6 +40,8 @@ class Incident {
   final IncidentStatus status;
   final IncidentSeverity severity;
   final String service;
+  final String organizationId;
+  final String teamId;
   final IncidentEnvironment environment;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -52,6 +59,8 @@ class Incident {
     IncidentStatus? status,
     IncidentSeverity? severity,
     String? service,
+    String? organizationId,
+    String? teamId,
     IncidentEnvironment? environment,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -66,6 +75,8 @@ class Incident {
       status: status ?? this.status,
       severity: severity ?? this.severity,
       service: service ?? this.service,
+      organizationId: organizationId ?? this.organizationId,
+      teamId: teamId ?? this.teamId,
       environment: environment ?? this.environment,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -191,6 +202,9 @@ class IncidentAdapter extends TypeAdapter<Incident> {
     final persistedIncidentNumber = rawIncidentNumber is int
         ? rawIncidentNumber
         : int.tryParse('$rawIncidentNumber');
+    final assignedProfile = findMockUserProfileByEmail(fields[9] as String?);
+    final rawOrganizationId = fields[11] as String?;
+    final rawTeamId = fields[12] as String?;
     return Incident(
       id: legacyOrInternalId,
       incidentNumber:
@@ -201,6 +215,11 @@ class IncidentAdapter extends TypeAdapter<Incident> {
       status: fields[3] as IncidentStatus,
       severity: fields[4] as IncidentSeverity,
       service: fields[5] as String,
+      organizationId:
+          rawOrganizationId ??
+          assignedProfile?.organizationId ??
+          defaultMockOrganizationId,
+      teamId: rawTeamId ?? assignedProfile?.teamId ?? defaultMockTeamId,
       environment: fields[6] as IncidentEnvironment,
       createdAt: fields[7] as DateTime,
       updatedAt: fields[8] as DateTime,
@@ -211,7 +230,7 @@ class IncidentAdapter extends TypeAdapter<Incident> {
   @override
   void write(BinaryWriter writer, Incident obj) {
     writer
-      ..writeByte(11)
+      ..writeByte(13)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -233,7 +252,11 @@ class IncidentAdapter extends TypeAdapter<Incident> {
       ..writeByte(9)
       ..write(obj.assignedTo)
       ..writeByte(10)
-      ..write(obj.incidentNumber);
+      ..write(obj.incidentNumber)
+      ..writeByte(11)
+      ..write(obj.organizationId)
+      ..writeByte(12)
+      ..write(obj.teamId);
   }
 }
 

@@ -6,6 +6,7 @@ import '../features/incidents/create_incident_screen.dart';
 import '../features/incidents/incident_detail_screen.dart';
 import '../features/incidents/incidents_list_screen.dart';
 import '../features/my_items/my_items_screen.dart';
+import '../features/teams/teams_screen.dart';
 
 /// Centralized route definitions and auth guard behavior.
 class AppRouter {
@@ -55,6 +56,11 @@ class AppRouter {
         GoRoute(
           path: '/my-items',
           builder: (context, state) => const MyItemsScreen(),
+        ),
+        GoRoute(
+          path: '/teams',
+          // Dedicated org/team management page with role-based permissions.
+          builder: (context, state) => const TeamsScreen(),
         ),
         GoRoute(path: '/outbox', redirect: (context, state) => '/my-items'),
       ],

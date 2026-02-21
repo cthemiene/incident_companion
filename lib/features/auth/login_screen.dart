@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../data/mock/mock_users.dart';
+import '../../shared/utils/user_role.dart';
 import 'auth_provider.dart';
 
 /// Entry screen for mock sign-in flow.
@@ -14,9 +16,11 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   bool _submitting = false;
+  String _selectedEmail = defaultMockUserEmail;
 
   @override
   Widget build(BuildContext context) {
+    final selectedProfile = defaultMockUserProfile(_selectedEmail);
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
@@ -49,6 +53,36 @@ class _LoginScreenState extends State<LoginScreen> {
                           style: Theme.of(context).textTheme.bodyMedium,
                         ),
                         const SizedBox(height: 18),
+                        // Mock user picker to test Admin/Manager/Member behaviors.
+                        DropdownButtonFormField<String>(
+                          initialValue: _selectedEmail,
+                          decoration: const InputDecoration(
+                            labelText: 'Mock User',
+                          ),
+                          items: mockUserProfiles
+                              .map(
+                                (profile) => DropdownMenuItem<String>(
+                                  value: profile.email,
+                                  child: Text(profile.email),
+                                ),
+                              )
+                              .toList(growable: false),
+                          onChanged: _submitting
+                              ? null
+                              : (value) {
+                                  if (value == null) {
+                                    return;
+                                  }
+                                  setState(() => _selectedEmail = value);
+                                },
+                        ),
+                        const SizedBox(height: 10),
+                        // Shows role and scope tied to the selected mock identity.
+                        Text(
+                          'Role: ${selectedProfile.role.label} | Org: ${selectedProfile.organizationId} | Team: ${selectedProfile.teamId}',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                        const SizedBox(height: 18),
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
@@ -70,7 +104,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ? null
                                 : () async {
                                     setState(() => _submitting = true);
-                                    await context.read<AuthProvider>().signIn();
+                                    await context.read<AuthProvider>().signIn(
+                                      email: _selectedEmail,
+                                    );
                                     if (!context.mounted) {
                                       return;
                                     }
