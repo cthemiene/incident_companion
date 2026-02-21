@@ -3,14 +3,15 @@
 A Flutter app for incident triage and update workflows with offline-first local persistence.
 
 The app includes:
-- Mock authentication
+- Mock authentication with role-based behavior (`admin`, `manager`, `member`)
 - Incident list with global search, status tabs, and top-down filters
-- Incident creation flow with auto-generated ticket numbers
+- Incident creation flow with auto-generated ticket numbers (`INC-######`)
 - Incident detail with assignment-aware update queueing
 - My Items view scoped to the current signed-in user
-- Shared search-based assignee selection in create/update flows
-- Legacy queue/sync simulation support (Outbox provider + sync simulation)
-- Hive-backed persistence for incidents, auth token, queued updates, and metadata counters
+- Shared search-based assignee selector in create/update flows
+- My Profile dialog with org chart and role-gated editing
+- Teams page in the 3-dot menu with role-based view/edit rules
+- Hive-backed persistence for incidents, auth state, queued updates, and metadata counters
 
 ---
 
@@ -20,47 +21,63 @@ The app includes:
 - `provider` for state management
 - `go_router` for navigation and auth guards
 - `hive` + `hive_flutter` for local persistence
-- `uuid` for immutable internal IDs (incidents + updates)
+- `uuid` for immutable IDs
 - `intl` for date/time formatting
 
 ---
 
 ## Architecture Overview
 
-This project uses a layered architecture with clear responsibilities.
-
 ```text
-UI (Screens + Widgets)
-  -> Providers (AuthProvider, IncidentsProvider, MyItemsProvider, OutboxProvider)
+UI (Screens + Shared Widgets)
+  -> Providers (Auth, Incidents, MyItems, Outbox)
     -> Repository (IncidentRepository / MockIncidentRepository)
       -> Local Storage (HiveService + Hive boxes)
+
+Mock Directory Layer (Users + Orgs + Teams)
+  -> mock_users.dart
+  -> mock_org_teams.dart
+  -> mock_scope_data.dart
 ```
 
 ### Layers
 
 1. UI Layer
-- Located in `lib/features/**` and `lib/shared/widgets/**`
-- Renders state from providers
-- Sends user actions to providers
+- `lib/features/**` and `lib/shared/widgets/**`
+- Renders provider state and dispatches user actions
 
 2. State Layer (Providers)
-- `AuthProvider`: authentication state + token persistence
-- `IncidentsProvider`: incident list state, global search, tabs, filters
-- `MyItemsProvider`: current-user assigned incidents, search, and filters
-- `OutboxProvider`: queued update state and sync simulation behavior
+- `AuthProvider`: token/session state + role/scope identity
+- `IncidentsProvider`: incident tabs, global search, filters, scoped loading
+- `MyItemsProvider`: current-user assigned items, search, and filters
+- `OutboxProvider`: queued update list + retry/delete/simulated sync
 
-3. Data Layer (Repository)
+3. Data Layer
 - `IncidentRepository` defines contracts
-- `MockIncidentRepository` implements contracts and seeds sample data
-- Handles filtering, pagination, queue writes, and reads
+- `MockIncidentRepository` implements data access, filtering, paging, migrations, and queue writes
 
-4. Persistence Layer (Hive)
+4. Persistence Layer
 - `HiveService.initialize()` runs before `runApp`
-- Opens and manages:
+- Boxes:
   - `incidents_box`
   - `outbox_box`
   - `auth_box`
-  - `metadata_box` (for `next_incident_number`)
+  - `metadata_box` (`next_incident_number`)
+
+---
+
+## Role Model
+
+- `Admin`
+  - Can view and edit all teams
+  - Can edit full profile and org-chart members
+- `Manager`
+  - Can edit current team on Teams page
+  - Can view other teams
+  - Profile and org chart are read-only
+- `Member`
+  - Can view current team only
+  - Profile and org chart are read-only
 
 ---
 
@@ -74,11 +91,12 @@ Routes:
 - `/incidents/new`
 - `/incidents/:id`
 - `/my-items`
+- `/teams`
 - `/outbox` (legacy redirect to `/my-items`)
 
 Redirect rules:
-- If unauthenticated and not on `/login` -> redirect to `/login`
-- If authenticated and on `/login` -> redirect to `/incidents`
+- If unauthenticated and not on `/login` -> `/login`
+- If authenticated and on `/login` -> `/incidents`
 
 ---
 
@@ -89,12 +107,14 @@ Located in `lib/data/models/`.
 ### `Incident`
 - `id` (internal immutable ID, UUID for new records)
 - `incidentNumber` (monotonic numeric sequence)
-- `displayId` (derived helper in code, formatted as `INC-000001`)
+- `displayId` (`INC-######` helper)
 - `title`
 - `description`
 - `status` (`open`, `inProgress`, `resolved`)
-- `severity` (`s1`, `s2`, `s3`, `s4`, `s5`) where `s5` is the lowest default
+- `severity` (`s1`, `s2`, `s3`, `s4`, `s5`) where `s5` is lowest/default
 - `service`
+- `organizationId`
+- `teamId`
 - `environment` (`prod`, `nonProd`)
 - `createdAt`
 - `updatedAt`
@@ -115,61 +135,62 @@ Manual Hive adapters are implemented and registered at startup.
 
 ---
 
+## Mock Directory (Centralized)
+
+All mock org/team/user directory data is segmented in dedicated files:
+
+- `lib/data/mock/mock_org_teams.dart`
+  - Canonical org IDs
+  - Canonical team IDs
+  - Team definitions and update helpers
+- `lib/data/mock/mock_users.dart`
+  - Mock users and role/scope profiles
+  - Org member lookup and profile update helpers
+- `lib/data/mock/mock_scope_data.dart`
+  - Shared org/team scope helpers for incident backfill/seed inference
+
+Legacy `org-globo` references are normalized to `org-global` by repository/auth migrations.
+
+---
+
 ## Feature Flow
 
 ### Sign in
 - `LoginScreen` calls `AuthProvider.signIn()`
-- Provider stores mock token in Hive `auth_box`
+- Session token + role/scope are persisted to `auth_box`
 - Router redirects to `/incidents`
 
 ### Browse incidents
-- `IncidentsListScreen` triggers `loadIncidents()` in `initState`
+- `IncidentsListScreen` loads incidents via provider
 - Search is global across status tabs when search text is present
-- Provider requests repository data with active tabs/search/filters
-- UI renders loading, empty, error, or list states
+- Loading/empty/error/list states are fully handled
 
 ### Create an incident
-- `CreateIncidentScreen` is opened from `/incidents/new`
-- Incident ticket ID preview is auto-generated and read-only
-- Save reserves the next incident number from `metadata_box`
-- Incident persists with:
-  - internal `id` (UUID)
-  - numeric `incidentNumber`
-  - user-facing `displayId` (`INC-...`)
-- On success, app navigates directly to new incident details
+- Open `/incidents/new`
+- Display ID preview is auto-generated and read-only
+- Save reserves next incident number from `metadata_box`
+- Incident persists with UUID internal `id` + numeric `incidentNumber`
 
-### Review my assigned work
-- `MyItemsScreen` is scoped to `AuthProvider.currentUserEmail`
-- Includes My Items-only search and filters (status, severity, environment)
-- Never shows incidents assigned to other users
-
-### Queue an update
+### Update an incident
 - `IncidentDetailScreen` opens `UpdateIncidentSheet`
-- On save:
-  - Creates `IncidentUpdate` (`pending`)
-  - Stores status change and optional `assignedTo`
-  - Writes to Hive outbox through repository
-  - Applies local optimistic update to incident details
-  - Refreshes outbox provider
-  - Shows snackbar (`Update queued`)
+- Save queues `IncidentUpdate` to outbox and applies optimistic incident updates locally
 
-### Assignment UX
-- `AssigneeSelectorField` is shared between create and update flows
-- Supports search-based user lookup from mock directory
-- Signed-in user is prioritized and available as quick action (`Assign to me`)
-- Supports clearing assignment (`Unassigned`)
-- Enforces valid assignment input (known user or cleared value)
+### My Items
+- Scoped to `AuthProvider.currentUserEmail`
+- My Items-specific search and filters
 
-### Incident ID strategy
-- Internal identity and display identity are intentionally separated:
-  - Internal `id`: immutable UUID for routing/storage/backend alignment
-  - Display ID: `INC-######` generated from `incidentNumber`
-- Next display number is persisted in `metadata_box` (`next_incident_number`)
-- Repository includes migration logic for older records that used `INC-###` as the storage key
+### My Profile
+- Open from 3-dot menu on incidents page
+- Displays current user profile + org chart members
+- Admin can edit profile and org chart entries
+- Manager/member read-only
 
-### Queue and sync simulation
-- `OutboxProvider` keeps queue state for retry/delete/simulate sync workflows
-- `simulateSync()` randomly transitions pending items to `synced` or `failed`
+### Teams
+- Open from 3-dot menu on incidents page
+- View/edit behavior is role-gated:
+  - Member: current team only (view)
+  - Manager: edit current team + view all
+  - Admin: edit all
 
 ---
 
@@ -185,6 +206,8 @@ lib/
       hive_service.dart
     mock/
       mock_incident_seed.dart
+      mock_org_teams.dart
+      mock_scope_data.dart
       mock_users.dart
     models/
       incident.dart
@@ -196,6 +219,7 @@ lib/
     auth/
       auth_provider.dart
       login_screen.dart
+      profile_dialog.dart
     incidents/
       create_incident_screen.dart
       incident_detail_screen.dart
@@ -210,7 +234,12 @@ lib/
     outbox/
       outbox_provider.dart
       outbox_screen.dart
+    teams/
+      teams_screen.dart
   shared/
+    utils/
+      permissions.dart
+      user_role.dart
     widgets/
       empty_state.dart
       loading_skeleton.dart
@@ -251,24 +280,21 @@ flutter analyze lib
 
 This project is intentionally mock-first:
 - No real backend integration yet
-- No secure auth flow yet
-- No real directory service for assignee lookup yet (mock user list)
-- No real telemetry provider yet
+- No secure auth provider yet
+- No external directory/identity integration yet
+- No real telemetry backend yet
 
-It is structured so these can be added without major rewrites.
+Structure is in place to replace mocks with service integrations incrementally.
 
 ---
 
 ## Next Improvements
 
 1. Replace mock repository with real API + DTO mapping
-2. Add real sync engine and retry policy
-3. Add tests:
-- provider unit tests
-- repository tests
-- widget tests for list/detail/outbox states
-4. Add pagination controls and infinite scroll
-5. Add role/permission behavior for update visibility
+2. Add unit/widget tests for providers and role-gated flows
+3. Add persistent team directory storage (Hive-backed team definitions)
+4. Add server-driven org chart and directory search
+5. Add stronger policy enforcement at repository boundary for team/profile writes
 
 ---
 

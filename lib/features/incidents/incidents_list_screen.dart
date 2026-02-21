@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../../data/models/incident.dart';
 import '../auth/auth_provider.dart';
+import '../auth/profile_dialog.dart';
 import 'incidents_provider.dart';
 import '../../shared/widgets/empty_state.dart';
 import '../../shared/widgets/loading_skeleton.dart';
@@ -75,6 +76,18 @@ class _IncidentsListScreenState extends State<IncidentsListScreen>
           ),
           PopupMenuButton<_AppMenuAction>(
             onSelected: (action) async {
+              if (action == _AppMenuAction.myProfile) {
+                await showDialog<void>(
+                  context: context,
+                  builder: (_) => const ProfileDialog(),
+                );
+                return;
+              }
+              if (action == _AppMenuAction.teams) {
+                // Opens centralized team directory/settings based on user role.
+                context.push('/teams');
+                return;
+              }
               if (action == _AppMenuAction.signOut) {
                 await context.read<AuthProvider>().signOut();
                 if (!context.mounted) {
@@ -84,6 +97,14 @@ class _IncidentsListScreenState extends State<IncidentsListScreen>
               }
             },
             itemBuilder: (context) => const <PopupMenuEntry<_AppMenuAction>>[
+              PopupMenuItem<_AppMenuAction>(
+                value: _AppMenuAction.myProfile,
+                child: Text('My Profile'),
+              ),
+              PopupMenuItem<_AppMenuAction>(
+                value: _AppMenuAction.teams,
+                child: Text('Teams'),
+              ),
               PopupMenuItem<_AppMenuAction>(
                 value: _AppMenuAction.signOut,
                 child: Text('Sign out'),
@@ -455,4 +476,4 @@ class _IncidentsListScreenState extends State<IncidentsListScreen>
   }
 }
 
-enum _AppMenuAction { signOut }
+enum _AppMenuAction { myProfile, teams, signOut }

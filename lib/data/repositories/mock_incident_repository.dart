@@ -5,6 +5,8 @@ import 'package:uuid/uuid.dart';
 
 import '../local/hive_service.dart';
 import '../mock/mock_incident_seed.dart';
+import '../mock/mock_org_teams.dart';
+import '../mock/mock_scope_data.dart';
 import '../models/incident.dart';
 import '../models/incident_update.dart';
 import 'incident_repository.dart';
@@ -185,12 +187,28 @@ class MockIncidentRepository implements IncidentRepository {
 
     // Migrate legacy INC-keyed records to internal UUID keys.
     await _migrateLegacyIncidentIds();
+    // Backfill scope fields for older records created before role support.
+    await _backfillLegacyScopeFields();
+    // Rename legacy organization IDs to the current canonical value.
+    await _migrateLegacyOrganizationIds();
     // Ensure the sequence counter is always valid after seed or migrations.
     await _synchronizeIncidentCounter();
   }
 
   /// Applies key-based filter rules used by provider screens.
   bool _matchesFilters(Incident incident, Map<String, dynamic> filters) {
+    final roleScope = filters['scopeRole'];
+    if (roleScope != null &&
+        !_matchesRoleScope(
+          incident,
+          roleScope: roleScope,
+          scopeUserEmail: filters['scopeUserEmail'],
+          scopeOrganizationId: filters['scopeOrganizationId'],
+          scopeTeamId: filters['scopeTeamId'],
+        )) {
+      return false;
+    }
+
     final status = filters['status'];
     if (status != null && !_matchesEnum(incident.status.name, status)) {
       return false;
@@ -222,6 +240,21 @@ class MockIncidentRepository implements IncidentRepository {
       }
     }
 
+    final organizationId = filters['organizationId'];
+    if (organizationId is String &&
+        organizationId.trim().isNotEmpty &&
+        incident.organizationId.toLowerCase() !=
+            organizationId.toLowerCase().trim()) {
+      return false;
+    }
+
+    final teamId = filters['teamId'];
+    if (teamId is String &&
+        teamId.trim().isNotEmpty &&
+        incident.teamId.toLowerCase() != teamId.toLowerCase().trim()) {
+      return false;
+    }
+
     return true;
   }
 
@@ -233,6 +266,8 @@ class MockIncidentRepository implements IncidentRepository {
       incident.title,
       incident.description,
       incident.service,
+      incident.organizationId,
+      incident.teamId,
       incident.status.name,
       incident.severity.name,
       incident.environment.name,
@@ -259,6 +294,50 @@ class MockIncidentRepository implements IncidentRepository {
       return enumName.toLowerCase() == candidate.trim().toLowerCase();
     }
     return false;
+  }
+
+  /// Evaluates role-scoped access rules for incident visibility filters.
+  bool _matchesRoleScope(
+    Incident incident, {
+    required dynamic roleScope,
+    required dynamic scopeUserEmail,
+    required dynamic scopeOrganizationId,
+    required dynamic scopeTeamId,
+  }) {
+    final role = _normalizeScopeValue(roleScope);
+    final userEmail = _normalizeScopeValue(scopeUserEmail);
+    final organizationId = _normalizeScopeValue(scopeOrganizationId);
+    final teamId = _normalizeScopeValue(scopeTeamId);
+
+    if (role == 'admin') {
+      return true;
+    }
+
+    if (role == 'manager') {
+      final inOrganization =
+          organizationId.isNotEmpty &&
+          incident.organizationId.toLowerCase() == organizationId;
+      final ownTicket =
+          userEmail.isNotEmpty &&
+          incident.assignedTo?.toLowerCase() == userEmail;
+      return inOrganization || ownTicket;
+    }
+
+    if (role == 'member') {
+      return teamId.isNotEmpty && incident.teamId.toLowerCase() == teamId;
+    }
+
+    // Unknown scope role defaults to allow no records.
+    return false;
+  }
+
+  /// Normalizes optional scope values into lowercase strings.
+  String _normalizeScopeValue(dynamic value) {
+    if (value == null) {
+      return '';
+    }
+    final normalized = '$value'.trim().toLowerCase();
+    return normalized == 'null' ? '' : normalized;
   }
 
   /// Reads next number from metadata with a safe fallback for resilience.
@@ -340,6 +419,43 @@ class MockIncidentRepository implements IncidentRepository {
       await _outboxBox.put(
         update.id,
         update.copyWith(incidentId: mappedIncidentId),
+      );
+    }
+  }
+
+  /// Backfills missing org/team values for incidents created before scope fields.
+  Future<void> _backfillLegacyScopeFields() async {
+    for (final incident in _incidentsBox.values.toList(growable: false)) {
+      final missingScope = isLegacyUnscopedIncident(
+        organizationId: incident.organizationId,
+        teamId: incident.teamId,
+      );
+      if (!missingScope) {
+        continue;
+      }
+      final inferredScope = inferMockIncidentScope(
+        service: incident.service,
+        assignedTo: incident.assignedTo,
+      );
+      await _incidentsBox.put(
+        incident.id,
+        incident.copyWith(
+          organizationId: inferredScope.organizationId,
+          teamId: inferredScope.teamId,
+        ),
+      );
+    }
+  }
+
+  /// Renames historical `org-globo` references to `org-global`.
+  Future<void> _migrateLegacyOrganizationIds() async {
+    for (final incident in _incidentsBox.values.toList(growable: false)) {
+      if (incident.organizationId.trim().toLowerCase() != 'org-globo') {
+        continue;
+      }
+      await _incidentsBox.put(
+        incident.id,
+        incident.copyWith(organizationId: mockOrgGlobalId),
       );
     }
   }

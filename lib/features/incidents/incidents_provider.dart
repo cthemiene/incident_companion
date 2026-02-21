@@ -1,20 +1,17 @@
 import 'package:flutter/foundation.dart';
 
-import '../../data/mock/mock_users.dart';
 import '../../data/models/incident.dart';
 import '../../data/repositories/incident_repository.dart';
+import '../auth/auth_provider.dart';
 
 /// Incident list state manager for tabs, search, and filters.
 class IncidentsProvider extends ChangeNotifier {
-  IncidentsProvider(
-    this._repository, {
-    this.meAssignee = defaultMockUserEmail,
-  }) {
+  IncidentsProvider(this._repository, this._authProvider) {
     _filters['status'] = _selectedTab;
   }
 
   final IncidentRepository _repository;
-  final String meAssignee;
+  final AuthProvider _authProvider;
 
   List<Incident> _list = <Incident>[];
   bool _loading = false;
@@ -49,7 +46,7 @@ class IncidentsProvider extends ChangeNotifier {
 
     try {
       final hasSearchText = _searchText.trim().isNotEmpty;
-      final effectiveFilters = _buildEffectiveFilters(
+      final effectiveFilters = _buildEffectiveFiltersWithScope(
         ignoreStatusFilter: hasSearchText,
       );
       _list = await _repository.getIncidents(
@@ -105,7 +102,10 @@ class IncidentsProvider extends ChangeNotifier {
           : _selectedSeverities.toList(growable: false),
     );
     _setOrRemoveFilter('environment', _environment);
-    _setOrRemoveFilter('assignedTo', _assignedToMe ? meAssignee : null);
+    _setOrRemoveFilter(
+      'assignedTo',
+      _assignedToMe ? _authProvider.currentUserEmail : null,
+    );
 
     _filters['status'] = _selectedTab;
 
@@ -146,5 +146,36 @@ class IncidentsProvider extends ChangeNotifier {
     }
 
     return result.isEmpty ? null : result;
+  }
+
+  /// Merges user access scope into active filters before repository query.
+  Map<String, dynamic>? _buildEffectiveFiltersWithScope({
+    required bool ignoreStatusFilter,
+  }) {
+    final result =
+        _buildEffectiveFilters(ignoreStatusFilter: ignoreStatusFilter) ??
+        <String, dynamic>{};
+    result.addAll(_buildScopeFilters());
+    return result.isEmpty ? null : result;
+  }
+
+  /// Produces role-scoped visibility filters for admin/manager/member.
+  Map<String, dynamic> _buildScopeFilters() {
+    final role = _authProvider.currentUserRole.name;
+    if (role == 'admin') {
+      return const <String, dynamic>{'scopeRole': 'admin'};
+    }
+    if (role == 'manager') {
+      return <String, dynamic>{
+        'scopeRole': 'manager',
+        'scopeUserEmail': _authProvider.currentUserEmail ?? '',
+        'scopeOrganizationId': _authProvider.currentOrganizationId ?? '',
+      };
+    }
+    return <String, dynamic>{
+      'scopeRole': 'member',
+      'scopeUserEmail': _authProvider.currentUserEmail ?? '',
+      'scopeTeamId': _authProvider.currentTeamId ?? '',
+    };
   }
 }

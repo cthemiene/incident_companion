@@ -1,4 +1,5 @@
 import '../models/incident.dart';
+import 'mock_scope_data.dart';
 import 'mock_users.dart';
 
 /// Returns deterministic mock incidents used to seed local Hive data.
@@ -13,6 +14,8 @@ List<Incident> buildMockIncidents({required DateTime now}) {
     final assignedTo = index % 3 == 0
         ? mockUserEmails[index % mockUserEmails.length]
         : null;
+    final assignedProfile = findMockUserProfileByEmail(assignedTo);
+    final fallbackScope = seedFallbackScopeForIndex(index);
 
     return Incident(
       // Seed incidents use stable internal IDs and separate display numbers.
@@ -24,6 +27,9 @@ List<Incident> buildMockIncidents({required DateTime now}) {
       status: row.status,
       severity: row.severity,
       service: row.service,
+      organizationId:
+          assignedProfile?.organizationId ?? fallbackScope.organizationId,
+      teamId: assignedProfile?.teamId ?? fallbackScope.teamId,
       environment: row.environment,
       createdAt: createdAt,
       updatedAt: updatedAt,

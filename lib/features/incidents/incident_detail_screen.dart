@@ -4,10 +4,12 @@ import 'package:provider/provider.dart';
 
 import '../../data/models/incident.dart';
 import '../../data/repositories/mock_incident_repository.dart';
+import '../../shared/utils/permissions.dart';
 import '../../shared/widgets/empty_state.dart';
 import '../../shared/widgets/loading_skeleton.dart';
 import '../../shared/widgets/severity_badge.dart';
 import '../../shared/widgets/status_chip.dart';
+import '../auth/auth_provider.dart';
 import 'widgets/update_incident_sheet.dart';
 
 /// Detailed incident view with update action and diagnostics placeholders.
@@ -33,6 +35,7 @@ class _IncidentDetailScreenState extends State<IncidentDetailScreen> {
 
   /// Loads the incident record from local repository state.
   Future<void> _loadIncident() async {
+    final authProvider = context.read<AuthProvider>();
     setState(() {
       _loading = true;
       _error = null;
@@ -42,6 +45,16 @@ class _IncidentDetailScreenState extends State<IncidentDetailScreen> {
       final incident = await context
           .read<MockIncidentRepository>()
           .getIncidentById(widget.incidentId);
+      final canView = PermissionPolicy.canViewIncident(
+        role: authProvider.currentUserRole,
+        incident: incident,
+        currentUserEmail: authProvider.currentUserEmail,
+        organizationId: authProvider.currentOrganizationId,
+        teamId: authProvider.currentTeamId,
+      );
+      if (!canView) {
+        throw StateError('You do not have permission to view this incident.');
+      }
       if (!mounted) {
         return;
       }
@@ -60,6 +73,15 @@ class _IncidentDetailScreenState extends State<IncidentDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final authProvider = context.watch<AuthProvider>();
+    final canEdit =
+        _incident != null &&
+        PermissionPolicy.canEditIncident(
+          role: authProvider.currentUserRole,
+          incident: _incident!,
+          currentUserEmail: authProvider.currentUserEmail,
+          organizationId: authProvider.currentOrganizationId,
+        );
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
@@ -75,7 +97,7 @@ class _IncidentDetailScreenState extends State<IncidentDetailScreen> {
         ),
         title: const Text('Incident Details'),
       ),
-      floatingActionButton: _incident == null
+      floatingActionButton: (_incident == null || !canEdit)
           ? null
           : FloatingActionButton.extended(
               onPressed: () => _openUpdateSheet(context, _incident!),
@@ -185,6 +207,11 @@ class _IncidentDetailScreenState extends State<IncidentDetailScreen> {
                     label: 'Assigned to',
                     value: incident.assignedTo ?? 'Unassigned',
                   ),
+                  _KeyValueRow(
+                    label: 'Organization',
+                    value: incident.organizationId,
+                  ),
+                  _KeyValueRow(label: 'Team', value: incident.teamId),
                 ],
               ),
             ),

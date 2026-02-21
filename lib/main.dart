@@ -34,8 +34,10 @@ class IncidentCompanionApp extends StatelessWidget {
         ),
         ChangeNotifierProvider<AuthProvider>(create: (_) => AuthProvider()),
         ChangeNotifierProvider<IncidentsProvider>(
-          create: (context) =>
-              IncidentsProvider(context.read<MockIncidentRepository>()),
+          create: (context) => IncidentsProvider(
+            context.read<MockIncidentRepository>(),
+            context.read<AuthProvider>(),
+          ),
         ),
         ChangeNotifierProvider<OutboxProvider>(
           create: (context) =>
