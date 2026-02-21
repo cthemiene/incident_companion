@@ -62,6 +62,12 @@ class _IncidentsListScreenState extends State<IncidentsListScreen>
       appBar: AppBar(
         title: const Text('Incidents'),
         actions: <Widget>[
+          // Primary creation entry point for adding new incidents.
+          TextButton.icon(
+            onPressed: () => context.push('/incidents/new'),
+            icon: const Icon(Icons.add_circle_outline, size: 18),
+            label: const Text('New Incident'),
+          ),
           TextButton.icon(
             onPressed: () => context.push('/my-items'),
             icon: const Icon(Icons.fact_check_outlined, size: 18),
@@ -193,7 +199,8 @@ class _IncidentsListScreenState extends State<IncidentsListScreen>
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: <Widget>[
                           Text(
-                            '${incident.id}  ${incident.title}',
+                            // Keep internal ID hidden; show user-facing INC ID.
+                            '${incident.displayId}  ${incident.title}',
                             style: Theme.of(context).textTheme.titleMedium
                                 ?.copyWith(fontWeight: FontWeight.w700),
                             maxLines: 1,

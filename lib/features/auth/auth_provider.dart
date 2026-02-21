@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../data/local/hive_service.dart';
+import '../../data/mock/mock_users.dart';
 
 /// Session state for mock authentication and current-user identity.
 class AuthProvider extends ChangeNotifier {
@@ -11,7 +12,6 @@ class AuthProvider extends ChangeNotifier {
 
   static const String _tokenKey = 'mock_token';
   static const String _userKey = 'mock_user';
-  static const String _defaultUserEmail = 'engineer1@example.com';
 
   final Uuid _uuid;
 
@@ -26,7 +26,7 @@ class AuthProvider extends ChangeNotifier {
   /// Creates a mock session token and persists user identity.
   Future<void> signIn() async {
     final token = 'mock_${_uuid.v4()}';
-    const userEmail = _defaultUserEmail;
+    const userEmail = defaultMockUserEmail;
     await HiveService.authBox.put(_tokenKey, token);
     await HiveService.authBox.put(_userKey, userEmail);
     _mockToken = token;

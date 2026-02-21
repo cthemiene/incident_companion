@@ -13,6 +13,7 @@ enum IncidentEnvironment { prod, nonProd }
 class Incident {
   const Incident({
     required this.id,
+    required this.incidentNumber,
     required this.title,
     required this.description,
     required this.status,
@@ -24,7 +25,11 @@ class Incident {
     this.assignedTo,
   });
 
+  /// Internal immutable identifier (UUID for newly created incidents).
   final String id;
+
+  /// Monotonic ticket number used to render customer-facing `INC-` IDs.
+  final int incidentNumber;
   final String title;
   final String description;
   final IncidentStatus status;
@@ -35,9 +40,13 @@ class Incident {
   final DateTime updatedAt;
   final String? assignedTo;
 
+  /// Public-facing incident ticket identifier (for example, `INC-000123`).
+  String get displayId => formatIncidentDisplayId(incidentNumber);
+
   /// Returns a modified copy while preserving unchanged fields.
   Incident copyWith({
     String? id,
+    int? incidentNumber,
     String? title,
     String? description,
     IncidentStatus? status,
@@ -51,6 +60,7 @@ class Incident {
   }) {
     return Incident(
       id: id ?? this.id,
+      incidentNumber: incidentNumber ?? this.incidentNumber,
       title: title ?? this.title,
       description: description ?? this.description,
       status: status ?? this.status,
@@ -174,8 +184,18 @@ class IncidentAdapter extends TypeAdapter<Incident> {
       fields[reader.readByte()] = reader.read();
     }
 
+    // Legacy records stored `id` as `INC-###`; newer records persist number
+    // separately for scalable display IDs.
+    final legacyOrInternalId = fields[0] as String;
+    final rawIncidentNumber = fields[10];
+    final persistedIncidentNumber = rawIncidentNumber is int
+        ? rawIncidentNumber
+        : int.tryParse('$rawIncidentNumber');
     return Incident(
-      id: fields[0] as String,
+      id: legacyOrInternalId,
+      incidentNumber:
+          persistedIncidentNumber ??
+          _parseIncidentNumberFromLegacyId(legacyOrInternalId),
       title: fields[1] as String,
       description: fields[2] as String,
       status: fields[3] as IncidentStatus,
@@ -191,7 +211,7 @@ class IncidentAdapter extends TypeAdapter<Incident> {
   @override
   void write(BinaryWriter writer, Incident obj) {
     writer
-      ..writeByte(10)
+      ..writeByte(11)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -211,8 +231,24 @@ class IncidentAdapter extends TypeAdapter<Incident> {
       ..writeByte(8)
       ..write(obj.updatedAt)
       ..writeByte(9)
-      ..write(obj.assignedTo);
+      ..write(obj.assignedTo)
+      ..writeByte(10)
+      ..write(obj.incidentNumber);
   }
+}
+
+/// Formats numeric incident sequence values into user-facing `INC-` IDs.
+String formatIncidentDisplayId(int incidentNumber, {int minDigits = 6}) {
+  final normalizedNumber = incidentNumber < 1 ? 1 : incidentNumber;
+  final normalizedWidth = minDigits < 1 ? 1 : minDigits;
+  return 'INC-${normalizedNumber.toString().padLeft(normalizedWidth, '0')}';
+}
+
+/// Extracts sequence number from legacy IDs that were stored as `INC-###`.
+int _parseIncidentNumberFromLegacyId(String value) {
+  final match = RegExp(r'^INC-(\d+)$', caseSensitive: false).firstMatch(value);
+  final parsed = int.tryParse(match?.group(1) ?? '');
+  return (parsed == null || parsed < 1) ? 1 : parsed;
 }
 
 /// Registers all incident-related adapters once at startup.

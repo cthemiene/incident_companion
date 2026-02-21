@@ -5,11 +5,12 @@ A Flutter app for incident triage and update workflows with offline-first local 
 The app includes:
 - Mock authentication
 - Incident list with global search, status tabs, and top-down filters
+- Incident creation flow with auto-generated ticket numbers
 - Incident detail with assignment-aware update queueing
 - My Items view scoped to the current signed-in user
-- Search-based assignee selection in update flow
+- Shared search-based assignee selection in create/update flows
 - Legacy queue/sync simulation support (Outbox provider + sync simulation)
-- Hive-backed persistence for incidents, auth token, and queued updates
+- Hive-backed persistence for incidents, auth token, queued updates, and metadata counters
 
 ---
 
@@ -19,7 +20,7 @@ The app includes:
 - `provider` for state management
 - `go_router` for navigation and auth guards
 - `hive` + `hive_flutter` for local persistence
-- `uuid` for update IDs
+- `uuid` for immutable internal IDs (incidents + updates)
 - `intl` for date/time formatting
 
 ---
@@ -59,6 +60,7 @@ UI (Screens + Widgets)
   - `incidents_box`
   - `outbox_box`
   - `auth_box`
+  - `metadata_box` (for `next_incident_number`)
 
 ---
 
@@ -69,6 +71,7 @@ Defined in `lib/app/router.dart`.
 Routes:
 - `/login`
 - `/incidents`
+- `/incidents/new`
 - `/incidents/:id`
 - `/my-items`
 - `/outbox` (legacy redirect to `/my-items`)
@@ -84,7 +87,9 @@ Redirect rules:
 Located in `lib/data/models/`.
 
 ### `Incident`
-- `id`
+- `id` (internal immutable ID, UUID for new records)
+- `incidentNumber` (monotonic numeric sequence)
+- `displayId` (derived helper in code, formatted as `INC-000001`)
 - `title`
 - `description`
 - `status` (`open`, `inProgress`, `resolved`)
@@ -123,6 +128,16 @@ Manual Hive adapters are implemented and registered at startup.
 - Provider requests repository data with active tabs/search/filters
 - UI renders loading, empty, error, or list states
 
+### Create an incident
+- `CreateIncidentScreen` is opened from `/incidents/new`
+- Incident ticket ID preview is auto-generated and read-only
+- Save reserves the next incident number from `metadata_box`
+- Incident persists with:
+  - internal `id` (UUID)
+  - numeric `incidentNumber`
+  - user-facing `displayId` (`INC-...`)
+- On success, app navigates directly to new incident details
+
 ### Review my assigned work
 - `MyItemsScreen` is scoped to `AuthProvider.currentUserEmail`
 - Includes My Items-only search and filters (status, severity, environment)
@@ -139,9 +154,18 @@ Manual Hive adapters are implemented and registered at startup.
   - Shows snackbar (`Update queued`)
 
 ### Assignment UX
-- Update sheet supports searching assignees instead of static dropdown selection
+- `AssigneeSelectorField` is shared between create and update flows
+- Supports search-based user lookup from mock directory
 - Signed-in user is prioritized and available as quick action (`Assign to me`)
 - Supports clearing assignment (`Unassigned`)
+- Enforces valid assignment input (known user or cleared value)
+
+### Incident ID strategy
+- Internal identity and display identity are intentionally separated:
+  - Internal `id`: immutable UUID for routing/storage/backend alignment
+  - Display ID: `INC-######` generated from `incidentNumber`
+- Next display number is persisted in `metadata_box` (`next_incident_number`)
+- Repository includes migration logic for older records that used `INC-###` as the storage key
 
 ### Queue and sync simulation
 - `OutboxProvider` keeps queue state for retry/delete/simulate sync workflows
@@ -159,6 +183,9 @@ lib/
   data/
     local/
       hive_service.dart
+    mock/
+      mock_incident_seed.dart
+      mock_users.dart
     models/
       incident.dart
       incident_update.dart
@@ -170,10 +197,12 @@ lib/
       auth_provider.dart
       login_screen.dart
     incidents/
+      create_incident_screen.dart
       incident_detail_screen.dart
       incidents_list_screen.dart
       incidents_provider.dart
       widgets/
+        assignee_selector_field.dart
         update_incident_sheet.dart
     my_items/
       my_items_provider.dart

@@ -180,7 +180,8 @@ class _MyItemsScreenState extends State<MyItemsScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: <Widget>[
                           Text(
-                            '${incident.id}  ${incident.title}',
+                            // Keep internal ID hidden; show user-facing INC ID.
+                            '${incident.displayId}  ${incident.title}',
                             style: Theme.of(context).textTheme.titleMedium,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
