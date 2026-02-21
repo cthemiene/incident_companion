@@ -44,7 +44,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'A Superlist-inspired workspace for incident handling.',
+                          'A ease of access-inspired workspace for incident handling.',
                           style: Theme.of(context).textTheme.bodyMedium,
                         ),
                         const SizedBox(height: 18),

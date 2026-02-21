@@ -8,6 +8,7 @@ import 'data/local/hive_service.dart';
 import 'data/repositories/mock_incident_repository.dart';
 import 'features/auth/auth_provider.dart';
 import 'features/incidents/incidents_provider.dart';
+import 'features/my_items/my_items_provider.dart';
 import 'features/outbox/outbox_provider.dart';
 
 Future<void> main() async {
@@ -34,6 +35,10 @@ class IncidentCompanionApp extends StatelessWidget {
         ChangeNotifierProvider<OutboxProvider>(
           create: (context) =>
               OutboxProvider(context.read<MockIncidentRepository>()),
+        ),
+        ChangeNotifierProvider<MyItemsProvider>(
+          create: (context) =>
+              MyItemsProvider(context.read<MockIncidentRepository>()),
         ),
         Provider<GoRouter>(
           create: (context) =>

@@ -45,9 +45,13 @@ class IncidentsProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
+      final hasSearchText = _searchText.trim().isNotEmpty;
+      final effectiveFilters = _buildEffectiveFilters(
+        ignoreStatusFilter: hasSearchText,
+      );
       _list = await _repository.getIncidents(
-        filters: _filters.isEmpty ? null : Map<String, dynamic>.from(_filters),
-        search: _searchText.trim().isEmpty ? null : _searchText.trim(),
+        filters: effectiveFilters,
+        search: hasSearchText ? _searchText.trim() : null,
         page: _page,
       );
     } catch (error) {
@@ -118,5 +122,20 @@ class IncidentsProvider extends ChangeNotifier {
       return;
     }
     _filters[key] = value;
+  }
+
+  Map<String, dynamic>? _buildEffectiveFilters({
+    required bool ignoreStatusFilter,
+  }) {
+    if (_filters.isEmpty) {
+      return null;
+    }
+
+    final result = Map<String, dynamic>.from(_filters);
+    if (ignoreStatusFilter) {
+      result.remove('status');
+    }
+
+    return result.isEmpty ? null : result;
   }
 }

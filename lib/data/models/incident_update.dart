@@ -11,6 +11,7 @@ class IncidentUpdate {
     required this.id,
     required this.incidentId,
     this.newStatus,
+    this.assignedTo,
     required this.comment,
     required this.visibility,
     required this.createdAt,
@@ -21,6 +22,7 @@ class IncidentUpdate {
   final String id;
   final String incidentId;
   final IncidentStatus? newStatus;
+  final String? assignedTo;
   final String comment;
   final IncidentVisibility visibility;
   final DateTime createdAt;
@@ -32,6 +34,8 @@ class IncidentUpdate {
     String? incidentId,
     IncidentStatus? newStatus,
     bool clearNewStatus = false,
+    String? assignedTo,
+    bool clearAssignedTo = false,
     String? comment,
     IncidentVisibility? visibility,
     DateTime? createdAt,
@@ -43,6 +47,7 @@ class IncidentUpdate {
       id: id ?? this.id,
       incidentId: incidentId ?? this.incidentId,
       newStatus: clearNewStatus ? null : (newStatus ?? this.newStatus),
+      assignedTo: clearAssignedTo ? null : (assignedTo ?? this.assignedTo),
       comment: comment ?? this.comment,
       visibility: visibility ?? this.visibility,
       createdAt: createdAt ?? this.createdAt,
@@ -131,13 +136,14 @@ class IncidentUpdateAdapter extends TypeAdapter<IncidentUpdate> {
       createdAt: fields[5] as DateTime,
       syncState: fields[6] as SyncState,
       lastError: fields[7] as String?,
+      assignedTo: fields[8] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, IncidentUpdate obj) {
     writer
-      ..writeByte(8)
+      ..writeByte(9)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -153,7 +159,9 @@ class IncidentUpdateAdapter extends TypeAdapter<IncidentUpdate> {
       ..writeByte(6)
       ..write(obj.syncState)
       ..writeByte(7)
-      ..write(obj.lastError);
+      ..write(obj.lastError)
+      ..writeByte(8)
+      ..write(obj.assignedTo);
   }
 }
 

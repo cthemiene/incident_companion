@@ -4,7 +4,7 @@ import '../features/auth/auth_provider.dart';
 import '../features/auth/login_screen.dart';
 import '../features/incidents/incident_detail_screen.dart';
 import '../features/incidents/incidents_list_screen.dart';
-import '../features/outbox/outbox_screen.dart';
+import '../features/my_items/my_items_screen.dart';
 
 class AppRouter {
   AppRouter._();
@@ -42,9 +42,10 @@ class AppRouter {
           },
         ),
         GoRoute(
-          path: '/outbox',
-          builder: (context, state) => const OutboxScreen(),
+          path: '/my-items',
+          builder: (context, state) => const MyItemsScreen(),
         ),
+        GoRoute(path: '/outbox', redirect: (context, state) => '/my-items'),
       ],
     );
   }

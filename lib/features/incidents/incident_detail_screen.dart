@@ -292,18 +292,21 @@ class _IncidentDetailScreenState extends State<IncidentDetailScreen> {
       showDragHandle: true,
       builder: (_) => UpdateIncidentSheet(
         incidentId: incident.id,
+        initialAssignedTo: incident.assignedTo,
         onQueuedUpdate: (update) {
           if (!mounted) {
             return;
           }
           final current = _incident;
-          if (current == null || update.newStatus == null) {
+          if (current == null) {
             return;
           }
           setState(
             () => _incident = current.copyWith(
-              status: update.newStatus!,
+              status: update.newStatus ?? current.status,
               updatedAt: update.createdAt,
+              assignedTo: update.assignedTo,
+              clearAssignedTo: update.assignedTo == null,
             ),
           );
         },
