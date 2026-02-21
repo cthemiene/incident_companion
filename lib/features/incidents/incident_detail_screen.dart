@@ -10,6 +10,7 @@ import '../../shared/widgets/severity_badge.dart';
 import '../../shared/widgets/status_chip.dart';
 import 'widgets/update_incident_sheet.dart';
 
+/// Detailed incident view with update action and diagnostics placeholders.
 class IncidentDetailScreen extends StatefulWidget {
   const IncidentDetailScreen({super.key, required this.incidentId});
 
@@ -30,6 +31,7 @@ class _IncidentDetailScreenState extends State<IncidentDetailScreen> {
     _loadIncident();
   }
 
+  /// Loads the incident record from local repository state.
   Future<void> _loadIncident() async {
     setState(() {
       _loading = true;
@@ -84,6 +86,7 @@ class _IncidentDetailScreenState extends State<IncidentDetailScreen> {
     );
   }
 
+  /// Renders loading/error/not-found/content states for detail.
   Widget _buildBody(BuildContext context) {
     if (_loading) {
       return const LoadingSkeleton(itemCount: 4);
@@ -244,6 +247,7 @@ class _IncidentDetailScreenState extends State<IncidentDetailScreen> {
     );
   }
 
+  /// Creates a simple timeline from incident metadata.
   List<_TimelineEntry> _buildTimeline(Incident incident) {
     final entries = <_TimelineEntry>[
       _TimelineEntry(time: incident.createdAt, message: 'Incident created'),
@@ -261,6 +265,7 @@ class _IncidentDetailScreenState extends State<IncidentDetailScreen> {
     return entries;
   }
 
+  /// Formats date/time for detail cards.
   String _formatDateTime(DateTime value) {
     final hour = value.hour.toString().padLeft(2, '0');
     final minute = value.minute.toString().padLeft(2, '0');
@@ -269,6 +274,7 @@ class _IncidentDetailScreenState extends State<IncidentDetailScreen> {
     return '$month/$day/${value.year} $hour:$minute';
   }
 
+  /// Converts enum status to user-facing copy.
   String _readableStatus(IncidentStatus status) {
     switch (status) {
       case IncidentStatus.open:
@@ -280,11 +286,13 @@ class _IncidentDetailScreenState extends State<IncidentDetailScreen> {
     }
   }
 
+  /// Deterministic placeholder metric for the signals card.
   int _fakeAppInsightsCount(String incidentId) {
     final seed = incidentId.codeUnits.fold<int>(0, (sum, code) => sum + code);
     return 40 + (seed % 260);
   }
 
+  /// Opens update sheet and applies optimistic in-memory updates.
   Future<void> _openUpdateSheet(BuildContext context, Incident incident) async {
     await showModalBottomSheet<void>(
       context: context,
@@ -315,6 +323,7 @@ class _IncidentDetailScreenState extends State<IncidentDetailScreen> {
   }
 }
 
+/// Simple labeled row used by the key-fields section.
 class _KeyValueRow extends StatelessWidget {
   const _KeyValueRow({required this.label, required this.value});
 
@@ -347,6 +356,7 @@ class _KeyValueRow extends StatelessWidget {
   }
 }
 
+/// Internal timeline DTO used by the view model helpers.
 class _TimelineEntry {
   const _TimelineEntry({required this.time, required this.message});
 

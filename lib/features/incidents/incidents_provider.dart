@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../../data/models/incident.dart';
 import '../../data/repositories/incident_repository.dart';
 
+/// Incident list state manager for tabs, search, and filters.
 class IncidentsProvider extends ChangeNotifier {
   IncidentsProvider(
     this._repository, {
@@ -38,6 +39,7 @@ class IncidentsProvider extends ChangeNotifier {
   IncidentEnvironment? get environment => _environment;
   bool get isEmpty => !_loading && _error == null && _list.isEmpty;
 
+  /// Loads incidents from repository based on current UI state.
   Future<void> loadIncidents({int page = 1}) async {
     _loading = true;
     _error = null;
@@ -62,15 +64,18 @@ class IncidentsProvider extends ChangeNotifier {
     }
   }
 
+  /// Re-runs the current query on the current page.
   Future<void> refresh() async {
     await loadIncidents(page: _page);
   }
 
+  /// Updates search text and reloads from the first page.
   Future<void> setSearch(String value) async {
     _searchText = value;
     await loadIncidents(page: 1);
   }
 
+  /// Updates list filters and reloads from the first page.
   Future<void> setFilters({
     Set<IncidentSeverity>? severities,
     IncidentEnvironment? environment,
@@ -106,12 +111,14 @@ class IncidentsProvider extends ChangeNotifier {
     await loadIncidents(page: 1);
   }
 
+  /// Updates the selected status tab and reloads from page one.
   Future<void> setTab(IncidentStatus status) async {
     _selectedTab = status;
     _filters['status'] = status;
     await loadIncidents(page: 1);
   }
 
+  /// Adds a filter entry when set, removes it when empty/null.
   void _setOrRemoveFilter(String key, dynamic value) {
     if (value == null) {
       _filters.remove(key);
@@ -124,6 +131,7 @@ class IncidentsProvider extends ChangeNotifier {
     _filters[key] = value;
   }
 
+  /// Builds request filters and optionally removes status for global search.
   Map<String, dynamic>? _buildEffectiveFilters({
     required bool ignoreStatusFilter,
   }) {

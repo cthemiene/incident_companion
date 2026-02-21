@@ -11,12 +11,17 @@ import 'features/incidents/incidents_provider.dart';
 import 'features/my_items/my_items_provider.dart';
 import 'features/outbox/outbox_provider.dart';
 
+/// App bootstrap:
+/// 1) Ensure Flutter bindings are ready.
+/// 2) Initialize Hive storage and adapters.
+/// 3) Start the provider-backed app shell.
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await HiveService.initialize();
   runApp(const IncidentCompanionApp());
 }
 
+/// Root widget that wires repositories, providers, router, and theme.
 class IncidentCompanionApp extends StatelessWidget {
   const IncidentCompanionApp({super.key});
 

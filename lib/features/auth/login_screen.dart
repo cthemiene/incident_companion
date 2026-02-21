@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import 'auth_provider.dart';
 
+/// Entry screen for mock sign-in flow.
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 

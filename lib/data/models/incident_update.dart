@@ -2,10 +2,13 @@ import 'package:hive/hive.dart';
 
 import 'incident.dart';
 
+/// Visibility scope for update notes.
 enum IncidentVisibility { workNotes, customerVisible }
 
+/// Local sync lifecycle for queued updates.
 enum SyncState { pending, failed, synced }
 
+/// Offline-first update payload queued before backend sync.
 class IncidentUpdate {
   const IncidentUpdate({
     required this.id,
@@ -29,6 +32,7 @@ class IncidentUpdate {
   final SyncState syncState;
   final String? lastError;
 
+  /// Returns a modified copy while preserving unchanged fields.
   IncidentUpdate copyWith({
     String? id,
     String? incidentId,
@@ -115,6 +119,7 @@ class SyncStateAdapter extends TypeAdapter<SyncState> {
   }
 }
 
+/// Hive adapter for persisted incident update queue items.
 class IncidentUpdateAdapter extends TypeAdapter<IncidentUpdate> {
   @override
   final int typeId = 6;
@@ -165,6 +170,7 @@ class IncidentUpdateAdapter extends TypeAdapter<IncidentUpdate> {
   }
 }
 
+/// Registers all incident-update-related adapters once at startup.
 void registerIncidentUpdateAdapters() {
   if (!Hive.isAdapterRegistered(4)) {
     Hive.registerAdapter(IncidentVisibilityAdapter());

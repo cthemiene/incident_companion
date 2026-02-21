@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
+/// Shared design system configuration for the entire app.
 class AppTheme {
   AppTheme._();
 
+  /// Light theme used by `MaterialApp.router`.
   static ThemeData light() {
     const primary = Color(0xFF1C6BFF);
     const secondary = Color(0xFF00A99D);

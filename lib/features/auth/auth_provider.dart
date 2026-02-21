@@ -3,6 +3,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../data/local/hive_service.dart';
 
+/// Session state for mock authentication and current-user identity.
 class AuthProvider extends ChangeNotifier {
   AuthProvider({Uuid? uuid}) : _uuid = uuid ?? const Uuid() {
     _restoreSession();
@@ -22,6 +23,7 @@ class AuthProvider extends ChangeNotifier {
   String? get mockToken => _mockToken;
   String? get currentUserEmail => _currentUserEmail;
 
+  /// Creates a mock session token and persists user identity.
   Future<void> signIn() async {
     final token = 'mock_${_uuid.v4()}';
     const userEmail = _defaultUserEmail;
@@ -33,6 +35,7 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Clears persisted auth state and in-memory session values.
   Future<void> signOut() async {
     await HiveService.authBox.delete(_tokenKey);
     await HiveService.authBox.delete(_userKey);
@@ -42,6 +45,7 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Restores session values from local storage on app startup.
   void _restoreSession() {
     final storedToken = HiveService.authBox.get(_tokenKey);
     final storedUser = HiveService.authBox.get(_userKey);

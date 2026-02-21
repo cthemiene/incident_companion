@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import '../../data/models/incident_update.dart';
 import '../../data/repositories/incident_repository.dart';
 
+/// Queue state manager used for pending/failed/synced update simulation.
 class OutboxProvider extends ChangeNotifier {
   OutboxProvider(this._repository, {Random? random})
     : _random = random ?? Random();
@@ -21,6 +22,7 @@ class OutboxProvider extends ChangeNotifier {
   String? get error => _error;
   bool get isEmpty => !_loading && _error == null && _list.isEmpty;
 
+  /// Loads queued updates from repository.
   Future<void> loadOutbox() async {
     _loading = true;
     _error = null;
@@ -36,6 +38,7 @@ class OutboxProvider extends ChangeNotifier {
     }
   }
 
+  /// Re-queues a failed item by resetting it to pending.
   Future<void> retry(String updateId) async {
     _loading = true;
     _error = null;
@@ -62,6 +65,7 @@ class OutboxProvider extends ChangeNotifier {
     }
   }
 
+  /// Removes an item from the queue.
   Future<void> delete(String updateId) async {
     _loading = true;
     _error = null;
@@ -78,6 +82,7 @@ class OutboxProvider extends ChangeNotifier {
     }
   }
 
+  /// Simulates backend sync outcomes for pending items.
   Future<void> simulateSync() async {
     _loading = true;
     _error = null;

@@ -4,9 +4,11 @@ A Flutter app for incident triage and update workflows with offline-first local 
 
 The app includes:
 - Mock authentication
-- Incident list with search, tab filters, and bottom-sheet filters
-- Incident detail with update queueing
-- Outbox with retry/delete and sync simulation
+- Incident list with global search, status tabs, and top-down filters
+- Incident detail with assignment-aware update queueing
+- My Items view scoped to the current signed-in user
+- Search-based assignee selection in update flow
+- Legacy queue/sync simulation support (Outbox provider + sync simulation)
 - Hive-backed persistence for incidents, auth token, and queued updates
 
 ---
@@ -28,7 +30,7 @@ This project uses a layered architecture with clear responsibilities.
 
 ```text
 UI (Screens + Widgets)
-  -> Providers (AuthProvider, IncidentsProvider, OutboxProvider)
+  -> Providers (AuthProvider, IncidentsProvider, MyItemsProvider, OutboxProvider)
     -> Repository (IncidentRepository / MockIncidentRepository)
       -> Local Storage (HiveService + Hive boxes)
 ```
@@ -42,8 +44,9 @@ UI (Screens + Widgets)
 
 2. State Layer (Providers)
 - `AuthProvider`: authentication state + token persistence
-- `IncidentsProvider`: incident list state, search, tabs, filters
-- `OutboxProvider`: queued update state, retry/delete/simulate sync
+- `IncidentsProvider`: incident list state, global search, tabs, filters
+- `MyItemsProvider`: current-user assigned incidents, search, and filters
+- `OutboxProvider`: queued update state and sync simulation behavior
 
 3. Data Layer (Repository)
 - `IncidentRepository` defines contracts
@@ -67,7 +70,8 @@ Routes:
 - `/login`
 - `/incidents`
 - `/incidents/:id`
-- `/outbox`
+- `/my-items`
+- `/outbox` (legacy redirect to `/my-items`)
 
 Redirect rules:
 - If unauthenticated and not on `/login` -> redirect to `/login`
@@ -84,7 +88,7 @@ Located in `lib/data/models/`.
 - `title`
 - `description`
 - `status` (`open`, `inProgress`, `resolved`)
-- `severity` (`s1`, `s2`, `s3`, `s4`, `s5`)
+- `severity` (`s1`, `s2`, `s3`, `s4`, `s5`) where `s5` is the lowest default
 - `service`
 - `environment` (`prod`, `nonProd`)
 - `createdAt`
@@ -115,22 +119,33 @@ Manual Hive adapters are implemented and registered at startup.
 
 ### Browse incidents
 - `IncidentsListScreen` triggers `loadIncidents()` in `initState`
+- Search is global across status tabs when search text is present
 - Provider requests repository data with active tabs/search/filters
 - UI renders loading, empty, error, or list states
+
+### Review my assigned work
+- `MyItemsScreen` is scoped to `AuthProvider.currentUserEmail`
+- Includes My Items-only search and filters (status, severity, environment)
+- Never shows incidents assigned to other users
 
 ### Queue an update
 - `IncidentDetailScreen` opens `UpdateIncidentSheet`
 - On save:
   - Creates `IncidentUpdate` (`pending`)
+  - Stores status change and optional `assignedTo`
   - Writes to Hive outbox through repository
+  - Applies local optimistic update to incident details
   - Refreshes outbox provider
   - Shows snackbar (`Update queued`)
 
-### Outbox operations
-- `OutboxScreen` lists queued updates from provider
-- Failed updates can be retried
-- Any update can be deleted
-- `Simulate Sync` randomly marks `pending` items as `synced` or `failed`
+### Assignment UX
+- Update sheet supports searching assignees instead of static dropdown selection
+- Signed-in user is prioritized and available as quick action (`Assign to me`)
+- Supports clearing assignment (`Unassigned`)
+
+### Queue and sync simulation
+- `OutboxProvider` keeps queue state for retry/delete/simulate sync workflows
+- `simulateSync()` randomly transitions pending items to `synced` or `failed`
 
 ---
 
@@ -160,6 +175,9 @@ lib/
       incidents_provider.dart
       widgets/
         update_incident_sheet.dart
+    my_items/
+      my_items_provider.dart
+      my_items_screen.dart
     outbox/
       outbox_provider.dart
       outbox_screen.dart
@@ -205,6 +223,7 @@ flutter analyze lib
 This project is intentionally mock-first:
 - No real backend integration yet
 - No secure auth flow yet
+- No real directory service for assignee lookup yet (mock user list)
 - No real telemetry provider yet
 
 It is structured so these can be added without major rewrites.

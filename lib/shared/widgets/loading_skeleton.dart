@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+/// Lightweight list placeholder used while async data is loading.
 class LoadingSkeleton extends StatelessWidget {
   const LoadingSkeleton({
     super.key,
