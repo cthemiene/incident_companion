@@ -2,7 +2,7 @@ import 'package:hive/hive.dart';
 
 enum IncidentStatus { open, inProgress, resolved }
 
-enum IncidentSeverity { s1, s2, s3, s4 }
+enum IncidentSeverity { s1, s2, s3, s4, s5 }
 
 enum IncidentEnvironment { prod, nonProd }
 
@@ -12,7 +12,7 @@ class Incident {
     required this.title,
     required this.description,
     required this.status,
-    required this.severity,
+    this.severity = IncidentSeverity.s5,
     required this.service,
     required this.environment,
     required this.createdAt,
@@ -105,8 +105,10 @@ class IncidentSeverityAdapter extends TypeAdapter<IncidentSeverity> {
         return IncidentSeverity.s3;
       case 3:
         return IncidentSeverity.s4;
+      case 4:
+        return IncidentSeverity.s5;
       default:
-        return IncidentSeverity.s4;
+        return IncidentSeverity.s5;
     }
   }
 
@@ -121,6 +123,8 @@ class IncidentSeverityAdapter extends TypeAdapter<IncidentSeverity> {
         writer.writeByte(2);
       case IncidentSeverity.s4:
         writer.writeByte(3);
+      case IncidentSeverity.s5:
+        writer.writeByte(4);
     }
   }
 }

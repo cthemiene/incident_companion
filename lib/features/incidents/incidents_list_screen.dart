@@ -61,9 +61,9 @@ class _IncidentsListScreenState extends State<IncidentsListScreen>
         title: const Text('Incidents'),
         actions: <Widget>[
           IconButton(
-            onPressed: () => context.push('/outbox'),
-            tooltip: 'Outbox',
-            icon: const Icon(Icons.outbox_outlined),
+            onPressed: () => context.push('/my-items'),
+            tooltip: 'My Items',
+            icon: const Icon(Icons.assignment_ind_outlined),
           ),
           PopupMenuButton<_AppMenuAction>(
             onSelected: (action) async {

@@ -5,16 +5,19 @@ import 'package:uuid/uuid.dart';
 import '../../../data/models/incident.dart';
 import '../../../data/models/incident_update.dart';
 import '../../../data/repositories/mock_incident_repository.dart';
+import '../../auth/auth_provider.dart';
 import '../../outbox/outbox_provider.dart';
 
 class UpdateIncidentSheet extends StatefulWidget {
   const UpdateIncidentSheet({
     super.key,
     required this.incidentId,
+    this.initialAssignedTo,
     this.onQueuedUpdate,
   });
 
   final String incidentId;
+  final String? initialAssignedTo;
   final ValueChanged<IncidentUpdate>? onQueuedUpdate;
 
   @override
@@ -22,10 +25,43 @@ class UpdateIncidentSheet extends StatefulWidget {
 }
 
 class _UpdateIncidentSheetState extends State<UpdateIncidentSheet> {
+  static const List<String> _defaultAssignableUsers = <String>[
+    'engineer1@example.com',
+    'engineer2@example.com',
+    'engineer3@example.com',
+    'engineer4@example.com',
+    'engineer5@example.com',
+  ];
+  static const String _unassignedValue = '__unassigned__';
+
   final TextEditingController _commentController = TextEditingController();
   IncidentStatus? _newStatus;
   IncidentVisibility _visibility = IncidentVisibility.workNotes;
   bool _submitting = false;
+
+  late final String _currentUserEmail;
+  late final List<String> _assignableUsers;
+  late String _selectedAssigneeValue;
+
+  @override
+  void initState() {
+    super.initState();
+    final authProvider = context.read<AuthProvider>();
+    _currentUserEmail =
+        authProvider.currentUserEmail ?? 'engineer1@example.com';
+    _assignableUsers = _buildAssignableUsers(_currentUserEmail);
+
+    final initial = widget.initialAssignedTo;
+    if (initial != null &&
+        initial.trim().isNotEmpty &&
+        !_assignableUsers.contains(initial.trim())) {
+      _assignableUsers.insert(1, initial.trim());
+    }
+
+    _selectedAssigneeValue = initial != null && initial.trim().isNotEmpty
+        ? initial.trim()
+        : _unassignedValue;
+  }
 
   @override
   void dispose() {
@@ -69,6 +105,31 @@ class _UpdateIncidentSheetState extends State<UpdateIncidentSheet> {
                 ),
               ],
               onChanged: (value) => setState(() => _newStatus = value),
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              initialValue: _selectedAssigneeValue,
+              decoration: const InputDecoration(labelText: 'Assign to'),
+              items: <DropdownMenuItem<String>>[
+                ..._assignableUsers.map(
+                  (user) => DropdownMenuItem<String>(
+                    value: user,
+                    child: Text(
+                      user == _currentUserEmail ? 'Me ($user)' : user,
+                    ),
+                  ),
+                ),
+                const DropdownMenuItem<String>(
+                  value: _unassignedValue,
+                  child: Text('Unassigned'),
+                ),
+              ],
+              onChanged: (value) {
+                if (value == null) {
+                  return;
+                }
+                setState(() => _selectedAssigneeValue = value);
+              },
             ),
             const SizedBox(height: 12),
             SegmentedButton<IncidentVisibility>(
@@ -125,6 +186,16 @@ class _UpdateIncidentSheetState extends State<UpdateIncidentSheet> {
     );
   }
 
+  List<String> _buildAssignableUsers(String currentUserEmail) {
+    final users = <String>[currentUserEmail];
+    for (final user in _defaultAssignableUsers) {
+      if (user != currentUserEmail) {
+        users.add(user);
+      }
+    }
+    return users;
+  }
+
   String _labelForStatus(IncidentStatus status) {
     switch (status) {
       case IncidentStatus.open:
@@ -150,10 +221,14 @@ class _UpdateIncidentSheetState extends State<UpdateIncidentSheet> {
     final outboxProvider = context.read<OutboxProvider>();
     final navigator = Navigator.of(context);
     final messenger = ScaffoldMessenger.of(context);
+    final assignedTo = _selectedAssigneeValue == _unassignedValue
+        ? null
+        : _selectedAssigneeValue;
     final update = IncidentUpdate(
       id: const Uuid().v4(),
       incidentId: widget.incidentId,
       newStatus: _newStatus,
+      assignedTo: assignedTo,
       comment: _commentController.text.trim(),
       visibility: _visibility,
       createdAt: DateTime.now(),
@@ -162,6 +237,7 @@ class _UpdateIncidentSheetState extends State<UpdateIncidentSheet> {
 
     try {
       await repository.queueUpdate(update);
+      await repository.applyUpdateLocally(update);
       await outboxProvider.loadOutbox();
       widget.onQueuedUpdate?.call(update);
 

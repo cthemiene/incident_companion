@@ -84,7 +84,7 @@ Located in `lib/data/models/`.
 - `title`
 - `description`
 - `status` (`open`, `inProgress`, `resolved`)
-- `severity` (`s1`, `s2`, `s3`, `s4`)
+- `severity` (`s1`, `s2`, `s3`, `s4`, `s5`)
 - `service`
 - `environment` (`prod`, `nonProd`)
 - `createdAt`
@@ -95,6 +95,7 @@ Located in `lib/data/models/`.
 - `id`
 - `incidentId`
 - `newStatus` (optional)
+- `assignedTo` (optional)
 - `comment`
 - `visibility` (`workNotes`, `customerVisible`)
 - `createdAt`

@@ -71,6 +71,22 @@ class MockIncidentRepository implements IncidentRepository {
     await _outboxBox.put(update.id, update);
   }
 
+  Future<void> applyUpdateLocally(IncidentUpdate update) async {
+    await _ensureInitialized();
+    final incident = _incidentsBox.get(update.incidentId);
+    if (incident == null) {
+      return;
+    }
+
+    final updatedIncident = incident.copyWith(
+      status: update.newStatus ?? incident.status,
+      updatedAt: update.createdAt,
+      assignedTo: update.assignedTo,
+      clearAssignedTo: update.assignedTo == null,
+    );
+    await _incidentsBox.put(incident.id, updatedIncident);
+  }
+
   @override
   Future<List<IncidentUpdate>> getOutbox() async {
     await _ensureInitialized();
@@ -206,22 +222,22 @@ class MockIncidentRepository implements IncidentRepository {
       IncidentSeverity.s2,
       IncidentSeverity.s3,
       IncidentSeverity.s4,
+      IncidentSeverity.s5,
       IncidentSeverity.s2,
       IncidentSeverity.s1,
       IncidentSeverity.s3,
       IncidentSeverity.s4,
+      IncidentSeverity.s5,
       IncidentSeverity.s1,
       IncidentSeverity.s2,
       IncidentSeverity.s3,
       IncidentSeverity.s4,
+      IncidentSeverity.s5,
       IncidentSeverity.s1,
       IncidentSeverity.s2,
       IncidentSeverity.s3,
       IncidentSeverity.s4,
-      IncidentSeverity.s1,
-      IncidentSeverity.s2,
-      IncidentSeverity.s3,
-      IncidentSeverity.s4,
+      IncidentSeverity.s5,
     ];
     const services = [
       'Checkout API',
