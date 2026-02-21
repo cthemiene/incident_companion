@@ -127,7 +127,8 @@ class _IncidentDetailScreenState extends State<IncidentDetailScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
                   Text(
-                    incident.id,
+                    // Display ticket ID while routing/persistence use internal ID.
+                    incident.displayId,
                     style: Theme.of(context).textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.w600,
                     ),

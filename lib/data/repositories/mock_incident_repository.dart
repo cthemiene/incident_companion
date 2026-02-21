@@ -1,8 +1,10 @@
 import 'dart:math';
 
 import 'package:hive/hive.dart';
+import 'package:uuid/uuid.dart';
 
 import '../local/hive_service.dart';
+import '../mock/mock_incident_seed.dart';
 import '../models/incident.dart';
 import '../models/incident_update.dart';
 import 'incident_repository.dart';
@@ -14,14 +16,58 @@ class MockIncidentRepository implements IncidentRepository {
 
   static const String incidentsBoxName = HiveService.incidentsBoxName;
   static const String outboxBoxName = HiveService.outboxBoxName;
+  static const String metadataBoxName = HiveService.metadataBoxName;
+  static const String _nextIncidentNumberKey = 'next_incident_number';
 
   final HiveInterface _hive;
   final int pageSize;
+  final Uuid _uuid = const Uuid();
   Future<void>? _initFuture;
 
   Box<Incident> get _incidentsBox => _hive.box<Incident>(incidentsBoxName);
   Box<IncidentUpdate> get _outboxBox =>
       _hive.box<IncidentUpdate>(outboxBoxName);
+  Box<dynamic> get _metadataBox => _hive.box<dynamic>(metadataBoxName);
+
+  /// Returns the next display incident ID without consuming the counter.
+  Future<String> generateNextIncidentId() async {
+    await _ensureInitialized();
+    return formatIncidentDisplayId(_peekNextIncidentNumber());
+  }
+
+  /// Reserves and returns the next incident number from metadata storage.
+  Future<int> reserveNextIncidentNumber() async {
+    await _ensureInitialized();
+    final reserved = _peekNextIncidentNumber();
+    await _metadataBox.put(_nextIncidentNumberKey, reserved + 1);
+    return reserved;
+  }
+
+  /// Creates a new incident in local storage.
+  @override
+  Future<void> createIncident(Incident incident) async {
+    await _ensureInitialized();
+    var incidentToPersist = incident;
+    if (incidentToPersist.id.trim().isEmpty) {
+      // Internal IDs are immutable and backend-safe UUIDs.
+      incidentToPersist = incidentToPersist.copyWith(id: _uuid.v4());
+    }
+    if (incidentToPersist.incidentNumber < 1) {
+      // Protects against callers forgetting to reserve a display number.
+      incidentToPersist = incidentToPersist.copyWith(
+        incidentNumber: await reserveNextIncidentNumber(),
+      );
+    }
+
+    if (_incidentsBox.containsKey(incidentToPersist.id)) {
+      throw StateError(
+        'Incident already exists for id: ${incidentToPersist.id}',
+      );
+    }
+    await _incidentsBox.put(incidentToPersist.id, incidentToPersist);
+    // Keep metadata counter ahead of imported/manual incident numbers.
+    await _ensureCounterAtLeast(incidentToPersist.incidentNumber + 1);
+  }
 
   /// Loads incidents from local storage with filtering, search, and paging.
   @override
@@ -125,13 +171,22 @@ class MockIncidentRepository implements IncidentRepository {
     if (!_hive.isBoxOpen(outboxBoxName)) {
       await _hive.openBox<IncidentUpdate>(outboxBoxName);
     }
+    if (!_hive.isBoxOpen(metadataBoxName)) {
+      await _hive.openBox<dynamic>(metadataBoxName);
+    }
 
     if (_incidentsBox.isEmpty) {
-      final seedData = _seedIncidents();
+      // Seed incidents only once so local edits persist across app restarts.
+      final seedData = buildMockIncidents(now: DateTime.now());
       await _incidentsBox.putAll({
         for (final incident in seedData) incident.id: incident,
       });
     }
+
+    // Migrate legacy INC-keyed records to internal UUID keys.
+    await _migrateLegacyIncidentIds();
+    // Ensure the sequence counter is always valid after seed or migrations.
+    await _synchronizeIncidentCounter();
   }
 
   /// Applies key-based filter rules used by provider screens.
@@ -173,6 +228,7 @@ class MockIncidentRepository implements IncidentRepository {
   /// Performs case-insensitive text search across key incident fields.
   bool _matchesSearch(Incident incident, String searchTerm) {
     final haystack = [
+      incident.displayId,
       incident.id,
       incident.title,
       incident.description,
@@ -205,118 +261,86 @@ class MockIncidentRepository implements IncidentRepository {
     return false;
   }
 
-  /// Generates deterministic demo incidents for local development.
-  List<Incident> _seedIncidents() {
-    final now = DateTime.now();
-    const statuses = [
-      IncidentStatus.open,
-      IncidentStatus.inProgress,
-      IncidentStatus.resolved,
-      IncidentStatus.open,
-      IncidentStatus.inProgress,
-      IncidentStatus.resolved,
-      IncidentStatus.open,
-      IncidentStatus.inProgress,
-      IncidentStatus.resolved,
-      IncidentStatus.open,
-      IncidentStatus.inProgress,
-      IncidentStatus.resolved,
-      IncidentStatus.open,
-      IncidentStatus.inProgress,
-      IncidentStatus.resolved,
-      IncidentStatus.open,
-      IncidentStatus.inProgress,
-      IncidentStatus.resolved,
-      IncidentStatus.open,
-      IncidentStatus.inProgress,
-    ];
-    const severities = [
-      IncidentSeverity.s1,
-      IncidentSeverity.s2,
-      IncidentSeverity.s3,
-      IncidentSeverity.s4,
-      IncidentSeverity.s5,
-      IncidentSeverity.s2,
-      IncidentSeverity.s1,
-      IncidentSeverity.s3,
-      IncidentSeverity.s4,
-      IncidentSeverity.s5,
-      IncidentSeverity.s1,
-      IncidentSeverity.s2,
-      IncidentSeverity.s3,
-      IncidentSeverity.s4,
-      IncidentSeverity.s5,
-      IncidentSeverity.s1,
-      IncidentSeverity.s2,
-      IncidentSeverity.s3,
-      IncidentSeverity.s4,
-      IncidentSeverity.s5,
-    ];
-    const services = [
-      'Checkout API',
-      'Payments Gateway',
-      'Auth Service',
-      'Catalog Search',
-      'Notification Worker',
-      'Mobile Backend',
-      'Order Fulfillment',
-      'Inventory Sync',
-      'Customer Portal',
-      'Edge Proxy',
-      'Checkout API',
-      'Payments Gateway',
-      'Auth Service',
-      'Catalog Search',
-      'Notification Worker',
-      'Mobile Backend',
-      'Order Fulfillment',
-      'Inventory Sync',
-      'Customer Portal',
-      'Edge Proxy',
-    ];
-    const environments = [
-      IncidentEnvironment.prod,
-      IncidentEnvironment.prod,
-      IncidentEnvironment.nonProd,
-      IncidentEnvironment.prod,
-      IncidentEnvironment.nonProd,
-      IncidentEnvironment.prod,
-      IncidentEnvironment.prod,
-      IncidentEnvironment.nonProd,
-      IncidentEnvironment.prod,
-      IncidentEnvironment.nonProd,
-      IncidentEnvironment.prod,
-      IncidentEnvironment.prod,
-      IncidentEnvironment.nonProd,
-      IncidentEnvironment.prod,
-      IncidentEnvironment.nonProd,
-      IncidentEnvironment.prod,
-      IncidentEnvironment.prod,
-      IncidentEnvironment.nonProd,
-      IncidentEnvironment.prod,
-      IncidentEnvironment.nonProd,
-    ];
+  /// Reads next number from metadata with a safe fallback for resilience.
+  int _peekNextIncidentNumber() {
+    final storedValue = _metadataBox.get(_nextIncidentNumberKey);
+    if (storedValue is int && storedValue > 0) {
+      return storedValue;
+    }
+    return _computeMaxIncidentNumber() + 1;
+  }
 
-    return List<Incident>.generate(20, (index) {
-      final createdAt = now.subtract(Duration(hours: (index + 1) * 4));
-      final updatedAt = createdAt.add(Duration(minutes: (index % 4) * 20));
-      final idNumber = (index + 1).toString().padLeft(3, '0');
+  /// Finds the highest stored incident number from existing records.
+  int _computeMaxIncidentNumber() {
+    var maxNumber = 0;
+    for (final incident in _incidentsBox.values) {
+      if (incident.incidentNumber > maxNumber) {
+        maxNumber = incident.incidentNumber;
+      }
+    }
+    return maxNumber;
+  }
 
-      return Incident(
-        id: 'INC-$idNumber',
-        title: 'Incident $idNumber',
-        description:
-            'Seeded incident for ${services[index]} in ${environments[index].name}.',
-        status: statuses[index],
-        severity: severities[index],
-        service: services[index],
-        environment: environments[index],
-        createdAt: createdAt,
-        updatedAt: updatedAt,
-        assignedTo: index % 3 == 0
-            ? 'engineer${(index % 5) + 1}@example.com'
-            : null,
-      );
+  /// Keeps `nextIncidentNumber` aligned with stored incident data.
+  Future<void> _synchronizeIncidentCounter() async {
+    final minimumNext = _computeMaxIncidentNumber() + 1;
+    await _ensureCounterAtLeast(minimumNext);
+  }
+
+  /// Advances counter only forward to avoid number reuse collisions.
+  Future<void> _ensureCounterAtLeast(int minimumNext) async {
+    final safeMinimum = minimumNext < 1 ? 1 : minimumNext;
+    final current = _metadataBox.get(_nextIncidentNumberKey);
+    if (current is int && current >= safeMinimum) {
+      return;
+    }
+    await _metadataBox.put(_nextIncidentNumberKey, safeMinimum);
+  }
+
+  /// Migrates legacy incidents keyed by `INC-###` to UUID internal keys.
+  Future<void> _migrateLegacyIncidentIds() async {
+    final legacyPattern = RegExp(r'^INC-(\d+)$', caseSensitive: false);
+    final legacyIncidents = _incidentsBox.values
+        .where((incident) => legacyPattern.hasMatch(incident.id))
+        .toList(growable: false);
+    if (legacyIncidents.isEmpty) {
+      return;
+    }
+
+    final existingIds = _incidentsBox.keys.whereType<String>().toSet();
+    final remappedIds = <String, String>{};
+
+    for (final legacyIncident in legacyIncidents) {
+      // Guarantee uniqueness even if random UUID collision is extremely rare.
+      var candidate = _uuid.v4();
+      while (existingIds.contains(candidate) ||
+          remappedIds.containsValue(candidate)) {
+        candidate = _uuid.v4();
+      }
+      remappedIds[legacyIncident.id] = candidate;
+      existingIds.add(candidate);
+    }
+
+    for (final legacyIncident in legacyIncidents) {
+      await _incidentsBox.delete(legacyIncident.id);
+    }
+    await _incidentsBox.putAll({
+      for (final legacyIncident in legacyIncidents)
+        remappedIds[legacyIncident.id]!: legacyIncident.copyWith(
+          id: remappedIds[legacyIncident.id],
+        ),
     });
+
+    // Keep outbox records pointing to valid incident internal IDs.
+    for (final update in _outboxBox.values.toList(growable: false)) {
+      final mappedIncidentId = remappedIds[update.incidentId];
+      if (mappedIncidentId == null) {
+        continue;
+      }
+      await _outboxBox.put(
+        update.id,
+        update.copyWith(incidentId: mappedIncidentId),
+      );
+    }
   }
 }

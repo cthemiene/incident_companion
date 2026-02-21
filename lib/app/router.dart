@@ -2,6 +2,7 @@ import 'package:go_router/go_router.dart';
 
 import '../features/auth/auth_provider.dart';
 import '../features/auth/login_screen.dart';
+import '../features/incidents/create_incident_screen.dart';
 import '../features/incidents/incident_detail_screen.dart';
 import '../features/incidents/incidents_list_screen.dart';
 import '../features/my_items/my_items_screen.dart';
@@ -39,6 +40,10 @@ class AppRouter {
         GoRoute(
           path: '/incidents',
           builder: (context, state) => const IncidentsListScreen(),
+        ),
+        GoRoute(
+          path: '/incidents/new',
+          builder: (context, state) => const CreateIncidentScreen(),
         ),
         GoRoute(
           path: '/incidents/:id',

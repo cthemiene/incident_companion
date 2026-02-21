@@ -10,6 +10,7 @@ class HiveService {
   static const String incidentsBoxName = 'incidents_box';
   static const String outboxBoxName = 'outbox_box';
   static const String authBoxName = 'auth_box';
+  static const String metadataBoxName = 'metadata_box';
 
   /// Initializes Hive, registers adapters, and opens app boxes.
   static Future<void> initialize() async {
@@ -27,6 +28,10 @@ class HiveService {
     if (!Hive.isBoxOpen(authBoxName)) {
       await Hive.openBox<String>(authBoxName);
     }
+    if (!Hive.isBoxOpen(metadataBoxName)) {
+      // Metadata stores mixed primitive values (for example counters/flags).
+      await Hive.openBox<dynamic>(metadataBoxName);
+    }
   }
 
   /// Box storing incidents used by list/detail/my-items flows.
@@ -38,4 +43,7 @@ class HiveService {
 
   /// Box storing mock auth session data.
   static Box<String> get authBox => Hive.box<String>(authBoxName);
+
+  /// Box storing app metadata such as global counters.
+  static Box<dynamic> get metadataBox => Hive.box<dynamic>(metadataBoxName);
 }

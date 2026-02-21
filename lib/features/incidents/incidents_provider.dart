@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../../data/mock/mock_users.dart';
 import '../../data/models/incident.dart';
 import '../../data/repositories/incident_repository.dart';
 
@@ -7,7 +8,7 @@ import '../../data/repositories/incident_repository.dart';
 class IncidentsProvider extends ChangeNotifier {
   IncidentsProvider(
     this._repository, {
-    this.meAssignee = 'engineer1@example.com',
+    this.meAssignee = defaultMockUserEmail,
   }) {
     _filters['status'] = _selectedTab;
   }
